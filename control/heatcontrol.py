@@ -4,6 +4,9 @@ from time import sleep
 from air_intake_servo import AirIntakeServoMotor
 from temperature_sensors import TemperatureSensors
 
+# TODO
+# * Summer program: start pump every x weeks for a short period
+
 class Heatcontrol(Thread):
 
 	def __init__(self):
@@ -46,8 +49,9 @@ class Heatcontrol(Thread):
 		self.air_profile = 'low'
 
 		self.t_relais_on = 40
-		self.t_relais_off = 73
+		self.t_relais_off = 70
 
+		self.t_air_intake_close_half = 35
 		self.t_air_intake_close = 45
 		self.t_air_intake_open = 65
 
@@ -123,14 +127,18 @@ class Heatcontrol(Thread):
 			if (t_fireplace <= self.t_relais_off and self.is_cooling): # or self.t_exhaust < xx:
 				pass
 
-			# Open air intake when we're cooling down
-			if t_fireplace <= self.t_air_intake_open and self.is_cooling:
-				self.servo.adjust_air_opening(100)
+			# Close air intake half when we're heating up
+			if t_fireplace >= self.t_air_intake_close_half and self.is_heating:
+				self.servo.adjust_air_opening(50)
 
 			# Close air intake when we're heating up
 			if t_fireplace >= self.t_air_intake_close and self.is_heating:
 				value = self.get_air_profile_value(self.air_profile)
 				self.servo.adjust_air_opening(value)
+
+			# Open air intake when we're cooling down
+			if t_fireplace <= self.t_air_intake_open and self.is_cooling:
+				self.servo.adjust_air_opening(100)
 
 			# Wait until next interval
 			sleep(self.interval)
