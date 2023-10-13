@@ -1,14 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import SwitchView from '../views/SwitchView.vue';
+import FireplaceView from '../views/FireplaceView.vue';
+import LampsView from '../views/LampsView.vue';
 
 const router = createRouter({
 	history: createWebHistory(import.meta.env.BASE_URL),
 	routes: [
 		{
-		path: '/',
-		name: 'home',
-		component: SwitchView
-		}/*,
+			path: '/',
+			name: 'fireplace',
+			component: FireplaceView
+		},
+		{
+			path: '/lamps',
+			name: 'lamps',
+			component: LampsView
+		}
+		/*,
 		{
 		path: '/about',
 		name: 'about',

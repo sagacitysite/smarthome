@@ -1,17 +1,26 @@
 <script setup lang="ts">
+import SvgIcon from '@jamescoyle/vue-icon';
+import { mdiLightbulb, mdiLightbulbOn } from '@mdi/js';
+
 const props = defineProps<{
 	name: string
 }>();
-
-console.log(props.name);
 </script>
 
 <template>
 	<div>
-		<img src="../assets/icons/lightbulb-off.svg" />
+		<svg-icon class="icon" type="mdi" :path="mdiLightbulb"></svg-icon>
 		<p>{{ name }}</p>
 	</div>
 </template>
 
 <style scoped>
+p {
+	text-align: center;
+}
+
+.icon {
+	height: 80px;
+	width: 80px;
+}
 </style>
