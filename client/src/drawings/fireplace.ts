@@ -10,7 +10,7 @@ export class Fireplace {
 		fontSize: 25,
 		fontFamily: 'Roboto',
 		fontWeight: 400,
-		fillColor: '#fff'
+		fillColor: new paper.Color(235, 235, 235, 0.64)
 	};
 
 	private fireplaceSize: any = { w: 120, h: 180 };
@@ -44,11 +44,13 @@ export class Fireplace {
 
 		// Store view center
 		this.ct = paper.view.center
+	}
 
+	async build() {
 		// Draw fireplace
 		this.fireplace.inner = this.drawFireplace();
 		this.fireplace.temperature = this.drawFireplaceTemperature();
-		this.fireplace.flame = this.drawFire();
+		this.fireplace.flame = await this.drawFireAsync();
 
 		// Draw watertank
 		this.watertank.tank = this.drawWatertank();
@@ -56,7 +58,41 @@ export class Fireplace {
 		this.watertank.temperatureBelow = this.drawTemperatureWatertankBelow();
 
 		// Draw flow and pump
-		this.flow.pump = this.drawFlowAndPump();
+		this.flow.pump = await this.drawFlowAndPumpAsync();
+
+		// During loading, we assume the fireplace to be off
+		this.isCooling();
+		this.stopPump();
+	}
+
+	isHeating() {
+		this.fireplace.flame.visible = true;
+		this.fireplace.inner.fillColor = '#100b08';
+	}
+
+	isCooling() {
+		this.fireplace.flame.visible = false;
+		this.fireplace.inner.fillColor = '#040404';
+	}
+
+	startPump() {
+		this.flow.pump.visible = true;
+	}
+
+	stopPump() {
+		this.flow.pump.visible = false;
+	}
+
+	setTemperatureFireplace(temperature: number) {
+		this.fireplace.temperature.content = `${temperature}°`;
+	}
+
+	setTemperatureTankAbove(temperature: number) {
+		this.watertank.temperatureAbove.content = `${temperature}°`;
+	}
+
+	setTemperatureTankBelow(temperature: number) {
+		this.watertank.temperatureBelow.content = `${temperature}°`;
 	}
 
 	/**
@@ -112,7 +148,7 @@ export class Fireplace {
 	/**
 	 * Fire flame icon
 	 */
-	async drawFire() {
+	async drawFireAsync() {
 		const fire: any = await this.importSVGAsync(this.fireIconPath);
 		fire.scale(2.5);
 		fire.position = new paper.Point(this.ct.x-150, this.ct.y+10);
@@ -149,14 +185,14 @@ export class Fireplace {
 	 * Temperature watertank below
 	 */
 	drawTemperatureWatertankBelow() {
-		const tempWaterBelow = new paper.PointText({
+		return new paper.PointText({
 			point: [this.ct.x+150-15, this.ct.y+60],
 			content: '00°',
 			style: this.textStyle
 		});
 	}
 
-	async drawFlowAndPump() {
+	async drawFlowAndPumpAsync() {
 		// Get all necessary sizes
 		const fp = this.fireplaceSize;
 		const wt = this.watertankSize;

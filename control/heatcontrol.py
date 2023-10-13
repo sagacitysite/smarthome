@@ -6,6 +6,7 @@ from temperature_sensors import TemperatureSensors
 
 # TODO
 # * Summer program: start pump every x weeks for a short period
+# * Renew servo position every x minutes
 
 class Heatcontrol(Thread):
 
@@ -21,7 +22,7 @@ class Heatcontrol(Thread):
 		# Instantiate servo motor
 		self.servo = AirIntakeServoMotor()
 
-		# Define a flag that determines a running thread
+		# Define a flag that indicates a running thread
 		self.is_running = True
 
 		# Variable to store current fireplace temperature
