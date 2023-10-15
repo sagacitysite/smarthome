@@ -3,10 +3,13 @@ from time import sleep
 
 from air_intake_servo import AirIntakeServoMotor
 from temperature_sensors import TemperatureSensors
+from mqtt import MqttClient
 
 # TODO
 # * Summer program: start pump every x weeks for a short period
 # * Renew servo position every x minutes
+# * 2 threads? one for temperature update (e.g. every 5 seconds) and one for servo/pump control (e.g. every minute)?
+#   or just split within the loop
 
 class Heatcontrol(Thread):
 
@@ -15,6 +18,9 @@ class Heatcontrol(Thread):
 		Init Heatcontrol
 		"""
 		super().__init__()
+
+		# Instantiate MQTT client
+		self.client = MqttClient()
 
 		# Instantiate temperature sensors
 		self.sensors = TemperatureSensors()
@@ -37,112 +43,152 @@ class Heatcontrol(Thread):
 		self.is_heating = False
 		self.is_cooling = False
 
-		# Configuration values, get from node.js API
+		# Define interval length in seconds
+		self.interval = 10
 
-		self.interval = 1 #15 # Define interval length in seconds
+		# Define after how many intervals the sensors/actuators are evaluated
+		self.interval_count_sensors = 1
+		self.interval_count_actuators = 12
 
-		self.air_profiles = {
-			'low': 0,
-			'medium': 25,
-			'high': 50
+		# Configuration values
+		# TODO get from node.js API (see below), this part can be deleted at some point
+
+		default_profile = {
+			't_relais_on': 40,
+			't_relais_off': 70,
+			't_air_intake_close_half': 35,
+			't_air_intake_close': 45,
+			't_air_intake_open': 65,
+			'air_intake_opening_at_full_burn': 0
 		}
 
-		self.air_profile = 'low'
+		self.profiles = {
+			'default':{
+				**default_profile
+			}, 
+			'bjork': {
+				**default_profile
+			},
+			'gran': {
+				**default_profile,
+				'air_intake_opening_at_full_burn': 20
+			}
+		}
 
-		self.t_relais_on = 40
-		self.t_relais_off = 70
 
-		self.t_air_intake_close_half = 35
-		self.t_air_intake_close = 45
-		self.t_air_intake_open = 65
-
-
-	def get_air_profile_value(self, air_profile_name):
+	def update_and_evaluate_sensors(self):
 		"""
-		Get air intake opening percentage value, based on air profile name
+		Update sensor values (i.e. temperatures)
 		"""
-		return self.air_profiles[air_profile_name]
+		# Store previous value of fireplace temperature
+		t_fireplace_previous = self.t_fireplace
 
-
-	def update_temperatures(self):
-		"""
-
-		"""
-		t_fireplace = 0
 		for name in list(self.sensors.sensor_map.keys()):
 			temp = self.sensors.get_temperature(name)
-			# TODO send temp to API
+
+			# Send temp to MQTT broker
+			self.client.publish(f'temperature/{name}', temp)
+
+			# Update object's fireplace temperature
 			if name == 'fireplace':
-				t_fireplace = temp
+				self.t_fireplace = temp
 
-		return t_fireplace
+		# Evaluate if fireplace temperature has increased of decreased
+		if int(self.t_fireplace) < int(t_fireplace_previous):  # Lower than before
+			self.count_up = 0  # Reset count up
+			self.count_down += 1  # Increase count down
+		elif int(self.t_fireplace) > int(t_fireplace_previous):  # Higher than before
+			self.count_down = 0  # Reset count down
+			self.count_up += 1  # Increase count up
 
-		#t_room = self.sensors.get_temperature('room')
-		#t_tank_top = self.sensors.get_temperature('tank_top')
-		#t_tank_bottom = self.sensors.get_temperature('tank_bottom')
+		# If we count sufficiently up, we are in heating state
+		if self.count_up >= 3:
+			self.is_cooling = False
+			self.is_heating = True
+		
+		# If we count sufficiently down, we are in cooling state
+		if self.count_down >= 3:
+			self.is_cooling = True
+			self.is_heating = False
+
+
+	def adjust_air_opening(self, opening):
+		"""
+		Adjust fireplace air opening and publish to mqtt broker
+		"""
+		self.servo.adjust_air_opening(opening)
+		self.client.publish(f'servo/fireplace', opening)
+
+
+	def switch_relais(self, state):
+		"""
+		Switch relais (on/off) and publish to mqtt broker
+		"""
+		# TODO self.relais.switch(state)
+		self.client.publish(f'pump/fireplace', state)
+
+
+	def evaluate_and_update_actuators(self, p):
+		"""
+		Update actuator values:
+		* Pump relais
+		* Servo motor for air intake
+		"""
+		# Switch ON relais
+		if self.t_fireplace >= p.t_relais_on and self.is_heating:
+			self.switch_relais(1)
+
+		# Switch OFF relais
+		# TODO improve with exhaust temperature for cases where buffer is hotter than 73 degree
+		if (self.t_fireplace <= p.t_relais_off and self.is_cooling): # or self.t_exhaust < xx:
+			self.switch_relais(0)
+
+		# Close air intake half when we're heating up
+		if self.t_fireplace >= p.t_air_intake_close_half and self.is_heating:
+			self.adjust_air_opening(50)
+
+		# Close air intake when we're heating up
+		if self.t_fireplace >= p.t_air_intake_close and self.is_heating:
+			self.adjust_air_opening(p.air_intake_opening_at_full_burn)
+
+		# Open air intake when we're cooling down
+		if self.t_fireplace <= p.t_air_intake_open and self.is_cooling:
+			self.adjust_air_opening(100)
 
 
 	def run(self):
 		"""
 		Run infinite loop, read sensor data and control motor/relay
 		"""
+		print('heatcontrol running')
+		counter = 0
 		while self.is_running:
+			# Execute every interval
+			if counter % self.interval_count_sensors == 0:
+				self.update_and_evaluate_sensors()
 
-			# Get temperatues
-			t_room = self.sensors.get_temperature('room')
-			t_tank_top = self.sensors.get_temperature('tank_top')
-			t_tank_bottom = self.sensors.get_temperature('tank_bottom')
+			"""
+			# Execute every twelvth interval
+			if counter % self.interval_count_actuators == 0:
+				# Get profile values
+				# NOTE this needs to be called regularly to allow on-the-fly profile changes by the user
+				# NOTE currently profile values are only used for actuators, but this MAY CHANGE
+				# TODO get all profile values from Node.js server (not only the profile name), since some profile values are possibly manually overwritten
+				# TODO improve stability: use previous profile, if Node.js server is not available, therefore store profile always in object (would also bin p to self, which is nicer to use)
+				# p = self.server.get_profile()
+				# p = self.profiles[profile_name] if profile_name in self.profiles else self.profiles['default']
+				p = self.profiles['default']
 
-			# Get current temperature from fireplace
-			t_fireplace = self.sensors.get_temperature('fireplace')
-			t_fireplace_previous = self.t_fireplace
-
-			# Lower than before
-			if t_fireplace < t_fireplace_previous:
-				self.count_up = 0  # Reset count up
-				self.count_down += 1  # Increase count down
-			# Higher than before
-			elif t_fireplace > t_fireplace_previous:
-				self.count_down = 0  # Reset count down
-				self.count_up += 1  # Increase count up
-
-			# Update fireplace temperatue
-			self.t_fireplace = t_fireplace
-
-			# If we count sufficiently up, we are in heating state
-			if self.count_up >= 3:
-				self.is_cooling = False
-				self.is_heating = True
-			
-			# If we count sufficiently down, we are in cooling state
-			if self.count_down >= 3:
-				self.is_cooling = True
-				self.is_heating = False
-
-			# Switch ON relais
-			if t_fireplace >= self.t_relais_on and self.is_heating:
-				pass
-
-			# Switch OFF relais
-			# TODO improve with exhaust temperature for cases where buffer is hotter than 73 degree
-			if (t_fireplace <= self.t_relais_off and self.is_cooling): # or self.t_exhaust < xx:
-				pass
-
-			# Close air intake half when we're heating up
-			if t_fireplace >= self.t_air_intake_close_half and self.is_heating:
-				self.servo.adjust_air_opening(50)
-
-			# Close air intake when we're heating up
-			if t_fireplace >= self.t_air_intake_close and self.is_heating:
-				value = self.get_air_profile_value(self.air_profile)
-				self.servo.adjust_air_opening(value)
-
-			# Open air intake when we're cooling down
-			if t_fireplace <= self.t_air_intake_open and self.is_cooling:
-				self.servo.adjust_air_opening(100)
+				self.evaluate_and_update_actuators(p)
+			"""
 
 			# Wait until next interval
 			sleep(self.interval)
+
+			# Update counter, reset after actuactors were updated
+			counter += 1
+			if counter % self.interval_count_actuators == 0:
+				counter = 0
 
 
 	def stop(self):
@@ -155,5 +201,7 @@ class Heatcontrol(Thread):
 		sleep(self.interval+1)
 		# Stop servo
 		self.servo.stop()
+		# Disconnect MQTT client
+		self.client.disconnect()
 		# Kill thread
 		self.join()

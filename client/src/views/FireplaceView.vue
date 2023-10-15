@@ -9,38 +9,14 @@ import { Fireplace } from '../drawings/fireplace';
 
 let isSetting = ref(false);
 
-// Init mqtt
-//let client = mqtt.connect("mqtt://localhost:1883");
-const options = {
-	keepalive: 60,
-	clientId: 'heatcontrol'
-}
-let client = mqtt.connect('ws://192.168.1.74:9001', options);
-
-client.on("connect", () => {
-  client.subscribe("temperature/fireplace", (err) => {
-    if (!err) {
-		console.log('subscribed');
-      client.publish("presence", "Hello mqtt");
-    }
-  });
-});
-
-client.on("message", (topic, message) => {
-	console.log('message');
-  // message is Buffer
-  console.log(message.toString());
-  client.end();
-});
-
 // Get canvas element from DOM
 const canvas = ref('canvas');
 
 onMounted(async () => {
-	/*const fireplace = new Fireplace(canvas.value);
+	const fireplace = new Fireplace(canvas.value);
 	await fireplace.build();
 
-	fireplace.setTemperatureFireplace(50);
+	/*fireplace.setTemperatureFireplace(50);
 	fireplace.setTemperatureTankAbove(70);
 	fireplace.setTemperatureTankBelow(30);
 
@@ -51,6 +27,28 @@ onMounted(async () => {
 	setTimeout(() => {
 		fireplace.startPump();
 	}, 6000);*/
+
+	// Init mqtt
+	const options = {
+		keepalive: 60,
+		clientId: 'screen'
+	}
+	let client = mqtt.connect('ws://192.168.1.74:9001', options);
+
+	client.on("connect", () => {
+		client.subscribe("temperature/fireplace", (err) => {
+			if (!err) {
+				console.log('subscribed');
+			}
+		});
+	});
+
+	client.on("message", (topic, message) => {
+		console.log(topic);
+		console.log(message.toString());
+		fireplace.setTemperatureFireplace(message.toString())
+		//client.end();
+	});
 });
 
 </script>

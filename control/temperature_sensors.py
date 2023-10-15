@@ -13,10 +13,10 @@ class TemperatureSensors():
 		# Map sensor name to sensor id
 		# NOTE 'fireplace' is required
 		self.sensor_map = {
-			'room': '3c01d075dea7'
-			#'fireplace': '',
+			'fireplace': '3c01d075dea7'
 			#'tank_top': '',
-			#'tank_bottom': ''
+			#'tank_bottom': '',
+			#'room': ''
 		}
 
 
