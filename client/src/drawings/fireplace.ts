@@ -28,8 +28,8 @@ export class Fireplace {
 	};
 	public watertank: any = {
 		tank: undefined,
-		temperatureAbove: undefined,
-		temperatureBelow: undefined
+		temperatureTop: undefined,
+		temperatureBottom: undefined
 	};
 	public flow: any = {
 		pump: undefined
@@ -54,8 +54,8 @@ export class Fireplace {
 
 		// Draw watertank
 		this.watertank.tank = this.drawWatertank();
-		this.watertank.temperatureAbove = this.drawTemperatureWatertankAbove();
-		this.watertank.temperatureBelow = this.drawTemperatureWatertankBelow();
+		this.watertank.temperatureTop = this.drawTemperatureWatertankTop();
+		this.watertank.temperatureBottom = this.drawTemperatureWatertankBottom();
 
 		// Draw flow and pump
 		this.flow.pump = await this.drawFlowAndPumpAsync();
@@ -87,12 +87,12 @@ export class Fireplace {
 		this.fireplace.temperature.content = `${temperature}°`;
 	}
 
-	setTemperatureTankAbove(temperature: number) {
-		this.watertank.temperatureAbove.content = `${temperature}°`;
+	setTemperatureTankTop(temperature: number) {
+		this.watertank.temperatureTop.content = `${temperature}°`;
 	}
 
-	setTemperatureTankBelow(temperature: number) {
-		this.watertank.temperatureBelow.content = `${temperature}°`;
+	setTemperatureTankBottom(temperature: number) {
+		this.watertank.temperatureBottom.content = `${temperature}°`;
 	}
 
 	/**
@@ -171,9 +171,9 @@ export class Fireplace {
 	}
 
 	/**
-	 * Temperature watertank above
+	 * Temperature watertank top
 	 */
-	drawTemperatureWatertankAbove() {
+	drawTemperatureWatertankTop() {
 		return new paper.PointText({
 			point: [this.ct.x+150-15, this.ct.y-60-5],
 			content: '00°',
@@ -182,9 +182,9 @@ export class Fireplace {
 	}
 	
 	/**
-	 * Temperature watertank below
+	 * Temperature watertank bottom
 	 */
-	drawTemperatureWatertankBelow() {
+	drawTemperatureWatertankBottom() {
 		return new paper.PointText({
 			point: [this.ct.x+150-15, this.ct.y+60],
 			content: '00°',

@@ -45,8 +45,26 @@ onMounted(async () => {
 
 	client.on("message", (topic, message) => {
 		console.log(topic);
+		console.log(message);
 		console.log(message.toString());
-		fireplace.setTemperatureFireplace(message.toString())
+		if (topic == 'temperature/fireplace') {
+			fireplace.setTemperatureFireplace(message.toString())
+		}
+		if (topic == 'temperature/tank_top') {
+			fireplace.setTemperatureTankTop(message.toString())
+		}
+		if (topic == 'temperature/tank_bottom') {
+			fireplace.setTemperatureTankBottom(message.toString())
+		}
+		if (topic == 'temperature/room') {
+			// TODO
+		}
+		if (topic == 'servo/fireplace') {
+			// TODO
+		}
+		if (topic == 'pump/fireplace') {
+			// TODO
+		}
 		//client.end();
 	});
 });

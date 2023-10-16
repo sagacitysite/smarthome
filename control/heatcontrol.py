@@ -3,13 +3,11 @@ from time import sleep
 
 from air_intake_servo import AirIntakeServoMotor
 from temperature_sensors import TemperatureSensors
+from pump_relay import FireplacePumpRelay
 from mqtt import MqttClient
 
 # TODO
 # * Summer program: start pump every x weeks for a short period
-# * Renew servo position every x minutes
-# * 2 threads? one for temperature update (e.g. every 5 seconds) and one for servo/pump control (e.g. every minute)?
-#   or just split within the loop
 
 class Heatcontrol(Thread):
 
@@ -27,6 +25,9 @@ class Heatcontrol(Thread):
 
 		# Instantiate servo motor
 		self.servo = AirIntakeServoMotor()
+
+		# Instantiate pump relay
+		self.pump = FireplacePumpRelay
 
 		# Define a flag that indicates a running thread
 		self.is_running = True
@@ -48,7 +49,8 @@ class Heatcontrol(Thread):
 
 		# Define after how many intervals the sensors/actuators are evaluated
 		self.interval_count_sensors = 1
-		self.interval_count_actuators = 12
+		self.interval_count_actuators = 6
+		self.interval_count_servo_refresh = 60
 
 		# Configuration values
 		# TODO get from node.js API (see below), this part can be deleted at some point
@@ -124,7 +126,7 @@ class Heatcontrol(Thread):
 		"""
 		Switch relais (on/off) and publish to mqtt broker
 		"""
-		# TODO self.relais.switch(state)
+		self.pump.set_state(state)
 		self.client.publish(f'pump/fireplace', state)
 
 
@@ -144,15 +146,28 @@ class Heatcontrol(Thread):
 			self.switch_relais(0)
 
 		# Close air intake half when we're heating up
-		if self.t_fireplace >= p.t_air_intake_close_half and self.is_heating:
+		if (
+				self.servo.state_air_intake != self.servo.INTAKE_CLOSE_HALF and
+				self.t_fireplace >= p.t_air_intake_close_half and
+				self.t_fireplace < p.t_air_intake_close and
+				self.is_heating
+			):
 			self.adjust_air_opening(50)
 
 		# Close air intake when we're heating up
-		if self.t_fireplace >= p.t_air_intake_close and self.is_heating:
+		if (
+				self.servo.state_air_intake != self.servo.INTAKE_CLOSE and
+				self.t_fireplace >= p.t_air_intake_close and
+				self.is_heating
+			):
 			self.adjust_air_opening(p.air_intake_opening_at_full_burn)
 
 		# Open air intake when we're cooling down
-		if self.t_fireplace <= p.t_air_intake_open and self.is_cooling:
+		if (
+				self.servo.state_air_intake != self.servo.INTAKE_OPEN and
+				self.t_fireplace <= p.t_air_intake_open and
+				self.is_cooling
+			):
 			self.adjust_air_opening(100)
 
 
@@ -169,7 +184,8 @@ class Heatcontrol(Thread):
 
 			"""
 			# Execute every twelvth interval
-			if counter % self.interval_count_actuators == 0:
+			# NOTE Don't update actuators when servos are refreshed
+			if counter % self.interval_count_actuators == 0 and counter % self.interval_count_servo_refresh != 0:
 				# Get profile values
 				# NOTE this needs to be called regularly to allow on-the-fly profile changes by the user
 				# NOTE currently profile values are only used for actuators, but this MAY CHANGE
@@ -182,12 +198,18 @@ class Heatcontrol(Thread):
 				self.evaluate_and_update_actuators(p)
 			"""
 
+			"""
+			# Refresh servo
+			if counter % self.interval_count_servo_refresh == 0:
+				self.adjust_air_opening(self.servo.state_air_intake)
+			"""
+
 			# Wait until next interval
 			sleep(self.interval)
 
-			# Update counter, reset after actuactors were updated
+			# Update counter, reset after latest interval count
 			counter += 1
-			if counter % self.interval_count_actuators == 0:
+			if counter % self.interval_count_servo_refresh == 0:
 				counter = 0
 
 

@@ -9,8 +9,8 @@ class AirIntakeServoMotor():
 		"""
 
 		# Init PIN and PWM frequency
-		servoPIN = 17
-		pwmFrequency = 50
+		servo_PIN = 17
+		pwm_frequency = 50
 
 		# Delay in seconds after new position command was executed
 		self.delay = 1
@@ -21,11 +21,17 @@ class AirIntakeServoMotor():
 		self.duty_diff = self.duty_open - self.duty_closed
 		self.duty_hundredth = self.duty_diff/100
 
+		# Variable indicating air intake state
+		self.INTAKE_OPEN = 0
+		self.INTAKE_CLOSE_HALF = 1
+		self.INTAKE_CLOSE = 2
+		self.state_air_intake = self.INTAKE_OPEN
+
 		# Setup GPIO PIN for servo motor
-		GPIO.setup(servoPIN, GPIO.OUT)
+		GPIO.setup(servo_PIN, GPIO.OUT)
 
 		# Initliaize and start servo PWM control
-		self.servo = GPIO.PWM(servoPIN, pwmFrequency)
+		self.servo = GPIO.PWM(servo_PIN, pwm_frequency)
 		self.servo.start(0)
 
 
