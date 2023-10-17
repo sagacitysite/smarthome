@@ -1,3 +1,4 @@
+import requests
 from threading import Thread
 from time import sleep
 
@@ -52,30 +53,17 @@ class Heatcontrol(Thread):
 		self.interval_count_actuators = 6
 		self.interval_count_servo_refresh = 60
 
-		# Configuration values
-		# TODO get from node.js API (see below), this part can be deleted at some point
 
-		default_profile = {
-			't_relais_on': 40,
-			't_relais_off': 70,
-			't_air_intake_close_half': 35,
-			't_air_intake_close': 45,
-			't_air_intake_open': 65,
-			'air_intake_opening_at_full_burn': 0
-		}
-
-		self.profiles = {
-			'default':{
-				**default_profile
-			}, 
-			'bjork': {
-				**default_profile
-			},
-			'gran': {
-				**default_profile,
-				'air_intake_opening_at_full_burn': 20
-			}
-		}
+	def get_profile(self):
+		"""
+		Request profile values from nodejs server
+		"""
+		r = requests.get('http://localhost:4000/profile')
+		
+		if r.status_code == 200:
+			return r.json()
+		else:
+			return {}
 
 
 	def update_and_evaluate_sensors(self):
@@ -189,12 +177,7 @@ class Heatcontrol(Thread):
 				# Get profile values
 				# NOTE this needs to be called regularly to allow on-the-fly profile changes by the user
 				# NOTE currently profile values are only used for actuators, but this MAY CHANGE
-				# TODO get all profile values from Node.js server (not only the profile name), since some profile values are possibly manually overwritten
-				# TODO improve stability: use previous profile, if Node.js server is not available, therefore store profile always in object (would also bin p to self, which is nicer to use)
-				# p = self.server.get_profile()
-				# p = self.profiles[profile_name] if profile_name in self.profiles else self.profiles['default']
-				p = self.profiles['default']
-
+				p = self.get_profile()
 				self.evaluate_and_update_actuators(p)
 			"""
 

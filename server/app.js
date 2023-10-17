@@ -1,9 +1,9 @@
 // Import official packages
-import { express } from 'express';
-import { bodyParser } from 'body-parser';
+import express from 'express';
+import bodyParser from 'body-parser';
 
 // Import own objects
-import { profiles } from 'data/profiles.js';
+import { Profile } from './profile.js';
 
 // Initialize express app
 const app = express();
@@ -16,9 +16,8 @@ app.use(function (req, res, next) {
 	next();
 });
 
-// Store currently selected profile name and the selected profile itself
-let profileName = 'default';
-let selectedProfile = profiles[profileName];
+// Instantiate profile
+const profile = new Profile();
 
 /**
  * Send the selected profile to the client
@@ -26,32 +25,10 @@ let selectedProfile = profiles[profileName];
  * @param {*} req
  * @param {*} res
  */
-function getProfile(req, res) {
-	res.send(selectedProfile);
+function getProfileValues(req, res) {
+	res.send(profile.getValues());
 }
 
-/**
- * Set profile name and also update selected profile
- * 
- * @param {*} req
- * @param {*} res
- */
-function setProfileName(req, res) {
-	// Get profile name from body
-	const name = req.body.name;
-
-	if (name in profiles) {
-		// Set profile name and update selected profile
-		profileName = name;
-		selectedProfile = profiles[name];
-		// Send OK
-		res.send('OK');
-	} else {
-		// If name was not found in profiles, send 'Bad request'
-		res.status(400);
-		res.send('Profile name is not valid.');
-	}
-}
 
 /**
  * Change value from selected profile
@@ -59,35 +36,36 @@ function setProfileName(req, res) {
  * @param {*} req
  * @param {*} res
  */
-function setValue (req, res) {
+function updateProfileValue (req, res) {
 	// Get key and value from profile to update
 	const key = req.body.key;
 	const value = req.body.value;
 
-	if (key in selectedProfile) {
-		// Update selected profile value
-		selectedProfile[key] = value;
-		// Send OK
+	// Update value in profile and get status
+	const status = profile.updateValue(key, value);
+
+	// Set status for response
+	res.status(status);
+
+	// Add messages, depending on status code
+	if (status == 200) {
 		res.send('OK');
-	} else {
-		// If key was not found in selectedProfile, send 'Bad request'
-		res.status(400);
+	}
+	else if (status == 400) {
 		res.send('Key not found in profile.');
 	}
 }
+
 
 // JSON Parser for post requests
 const jsonParser = bodyParser.json()
 
 // Used from Python control script, get the currently selected profile
 // Takes into accont overwritten values
-app.get('/profile', getProfile);
-
-// Used from frontend, where user chooses the heating profile
-app.post('/profile_name', jsonParser, setProfileName);  // Just store this in memory, after reboot just use 'default'
+app.get('/profile', getProfileValues);
 
 // Used from frontend to overwrite profile values
-app.post('/set_value', jsonParser, setValue);
+app.patch('/profile', jsonParser, updateProfileValue);
 
 // Start server
 const port = 4000;

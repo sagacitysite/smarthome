@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import SvgIcon from '@jamescoyle/vue-icon';
-import { mdiThermometer, mdiCog } from '@mdi/js';
+import { mdiThermometer, mdiCog, mdiPlus, mdiMinus } from '@mdi/js';
 import { ref, onMounted } from 'vue'
 //import * as mqtt from 'mqtt';
 import * as mqtt from 'mqtt/dist/mqtt.min'
 
 import { Fireplace } from '../drawings/fireplace';
+
+const settings = [
+	{ 'key': 't_relais_on', 'label': 'Relay ON', 'value': 40, 'unit': '°' },
+	{ 'key': 't_relais_off', 'label': 'Relay OFF', 'value': 70, 'unit': '°' },
+	{ 'key': 't_air_intake_close_half', 'label': 'Half close air intake', 'value': 35, 'unit': '°' },
+	{ 'key': 't_air_intake_close', 'label': 'Full close air intake', 'value': 45, 'unit': '°' },
+	{ 'key': 't_air_intake_open', 'label': 'Open air intake', 'value': 65, 'unit': '°' },
+	{ 'key': 'air_intake_opening_at_full_burn', 'label': 'Opening at full close', 'value': 0, 'unit': '%' }
+]
+
+// TODO get values from nodejs server
+// Rather use mqtt instead of http? just for the case that another interface changes values?
 
 let isSetting = ref(false);
 
@@ -76,7 +88,18 @@ onMounted(async () => {
 		<section class="status" v-show="!isSetting">
 			<canvas id="canvas" ref="canvas" resize></canvas>
 		</section>
-		<section class="setting" v-show="isSetting">Setting</section>
+		<section class="setting" v-show="isSetting">
+			<div class="setting-row" v-for="s in settings">
+				<a @click="">
+					<svg-icon class="icon" type="mdi" :path="mdiMinus"></svg-icon>
+				</a>
+				<span class="value">{{ s.value }}{{ s.unit }}</span>
+				<a @click="">
+					<svg-icon class="icon" type="mdi" :path="mdiPlus"></svg-icon>
+				</a>
+				<span class="label">{{ s.label }}</span>
+			</div>
+		</section>
 	</div>
 	<div class="tabs">
 		<ul>
@@ -100,8 +123,13 @@ onMounted(async () => {
 	height: 80vh;
 }
 
-.icon {
-	margin-right: 0.25rem;
+a {
+	display: flex;
+	align-items: center;
+	cursor: pointer;
+	font-size: 16px;
+	margin: 0 5px;
+	border-radius: 5px;
 }
 
 .window {
@@ -121,18 +149,47 @@ onMounted(async () => {
 	justify-content: center;
 }
 
+.tabs .icon {
+	margin-right: 0.25rem;
+}
+
 .tabs ul li a {
-	display: flex;
-	align-items: center;
-	cursor: pointer;
-	font-size: 16px;
-	line-height: 50px;
 	padding: 0 18px 0 15px;
-	margin: 0 5px;
-	border-radius: 5px;
+	height: 50px;
+	line-height: 50px;
 }
 
 .tabs ul li a.active {
 	background-color: var(--black-highlight);
+}
+
+.setting {
+	padding: 30px;
+}
+
+.setting-row {
+	display: flex;
+	margin-bottom: 10px;
+}
+
+.setting .value {
+	color: var(--white);
+	text-align: center;
+	font-size: 20px;
+	height: 30px;
+	width: 55px;
+	line-height: 30px;
+}
+
+.setting .label {
+	margin-left: 12px;
+	font-size: 18px;
+	line-height: 30px;
+}
+
+.setting a {
+	color: var(--white);
+	background-color: var(--black-highlight);
+	padding: 5px;
 }
 </style>
