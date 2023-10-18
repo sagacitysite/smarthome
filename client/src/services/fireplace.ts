@@ -24,6 +24,7 @@ export class Fireplace {
 	public fireplace: any = {
 		inner: undefined,
 		temperature: undefined,
+		servo: undefined,
 		flame: undefined
 	};
 	public watertank: any = {
@@ -50,6 +51,7 @@ export class Fireplace {
 		// Draw fireplace
 		this.fireplace.inner = this.drawFireplace();
 		this.fireplace.temperature = this.drawFireplaceTemperature();
+		this.fireplace.servo = this.drawFireplaceAirIntake();
 		this.fireplace.flame = await this.drawFireAsync();
 
 		// Draw watertank
@@ -60,9 +62,7 @@ export class Fireplace {
 		// Draw flow and pump
 		this.flow.pump = await this.drawFlowAndPumpAsync();
 
-		// During loading, we assume the fireplace to be off
-		this.isCooling();
-		this.stopPump();
+		this.isHeating();
 	}
 
 	isHeating() {
@@ -81,6 +81,10 @@ export class Fireplace {
 
 	stopPump() {
 		this.flow.pump.visible = false;
+	}
+
+	setServoOpening(opening: number) {
+		this.fireplace.servo.content = `${opening}%`;
 	}
 
 	setTemperatureFireplace(temperature: number) {
@@ -125,7 +129,7 @@ export class Fireplace {
 		const fireplaceInner = new paper.Path.Rectangle({
 			point: [this.ct.x-fpIn.w/2-150, this.ct.y-fpIn.h/2],
 			size: [fpIn.w, fpIn.h],
-			fillColor: '#100b08', //'#040404',
+			fillColor: '#040404',
 			strokeColor: '#222222',
 			strokeWidth: 2
 		});
@@ -146,12 +150,24 @@ export class Fireplace {
 	}
 
 	/**
+	 * Air intake fireplace
+	 */
+	drawFireplaceAirIntake() {
+		return new paper.PointText({
+			point: [this.ct.x-150-18, this.ct.y+75],
+			content: '00%',
+			style: this.textStyle
+		});
+	}
+
+	/**
 	 * Fire flame icon
 	 */
 	async drawFireAsync() {
 		const fire: any = await this.importSVGAsync(this.fireIconPath);
 		fire.scale(2.5);
 		fire.position = new paper.Point(this.ct.x-150, this.ct.y+10);
+		fire.visible = false;
 
 		return fire;
 	}
@@ -225,13 +241,12 @@ export class Fireplace {
 		});
 
 		// Icon path
-		
 		const pump: any = await this.importSVGAsync(this.pumpIconPath);
 		pump.position = new paper.Point(this.ct.x, this.ct.y+fp.h/2-20);
 		paper.view.onFrame = function(event: any) {
 			pump.rotate(2);
 		}
-		//pump.visible = true;
+		pump.visible = false;
 
 		return pump;
 	}

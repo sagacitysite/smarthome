@@ -53,6 +53,16 @@ class Heatcontrol(Thread):
 		self.interval_count_actuators = 6
 		self.interval_count_servo_refresh = 60
 
+		# Get parameters from server
+		self.profile = self.get_profile()
+		print('self.profile', self.profile)
+
+		# Add profile dict to MQTT client which can then update values
+		self.client.add_object('profile', self.profile)
+
+		# Subscribe to changes of fireplace parameters
+		self.client.subscribe('fireplace/parameter', qos=2)
+
 
 	def get_profile(self):
 		"""
@@ -77,10 +87,15 @@ class Heatcontrol(Thread):
 			temp = self.sensors.get_temperature(name)
 
 			# Send temp to MQTT broker
-			self.client.publish(f'temperature/{name}', temp)
-
-			# Update object's fireplace temperature
+			if name == 'room':
+				self.client.publish(f'room/temperature', temp)
+			if name == 'tank_top':
+				self.client.publish(f'buffertank/temperature/top', temp)
+			if name == 'tank_bottom':
+				self.client.publish(f'buffertank/temperature/bottom', temp)
 			if name == 'fireplace':
+				self.client.publish(f'fireplace/temperature', temp, qos=2)
+				# Update object's fireplace temperature
 				self.t_fireplace = temp
 
 		# Evaluate if fireplace temperature has increased of decreased
@@ -91,13 +106,15 @@ class Heatcontrol(Thread):
 			self.count_down = 0  # Reset count down
 			self.count_up += 1  # Increase count up
 
-		# If we count sufficiently up, we are in heating state
-		if self.count_up >= 3:
+		# If we count sufficiently up, we switch from cooling to heating state
+		if self.is_cooling and self.count_up >= 3:
+			self.client.publish(f'fireplace/heating_state', True, qos=2)
 			self.is_cooling = False
 			self.is_heating = True
 		
-		# If we count sufficiently down, we are in cooling state
-		if self.count_down >= 3:
+		# If we count sufficiently down, we switch from heating to cooling state
+		if self.is_heating and self.count_down >= 3:
+			self.client.publish(f'fireplace/heating_state', False, qos=2)
 			self.is_cooling = True
 			self.is_heating = False
 
@@ -107,7 +124,7 @@ class Heatcontrol(Thread):
 		Adjust fireplace air opening and publish to mqtt broker
 		"""
 		self.servo.adjust_air_opening(opening)
-		self.client.publish(f'servo/fireplace', opening)
+		self.client.publish(f'fireplace/servo', opening, qos=2)
 
 
 	def switch_relais(self, state):
@@ -115,15 +132,18 @@ class Heatcontrol(Thread):
 		Switch relais (on/off) and publish to mqtt broker
 		"""
 		self.pump.set_state(state)
-		self.client.publish(f'pump/fireplace', state)
+		self.client.publish(f'fireplace/pump', state, qos=2)
 
 
-	def evaluate_and_update_actuators(self, p):
+	def evaluate_and_update_actuators(self):
 		"""
 		Update actuator values:
 		* Pump relais
 		* Servo motor for air intake
 		"""
+		# Shorthand for profile values
+		p = self.profile
+
 		# Switch ON relais
 		if self.t_fireplace >= p.t_relais_on and self.is_heating:
 			self.switch_relais(1)
@@ -174,11 +194,7 @@ class Heatcontrol(Thread):
 			# Execute every twelvth interval
 			# NOTE Don't update actuators when servos are refreshed
 			if counter % self.interval_count_actuators == 0 and counter % self.interval_count_servo_refresh != 0:
-				# Get profile values
-				# NOTE this needs to be called regularly to allow on-the-fly profile changes by the user
-				# NOTE currently profile values are only used for actuators, but this MAY CHANGE
-				p = self.get_profile()
-				self.evaluate_and_update_actuators(p)
+				self.evaluate_and_update_actuators()
 			"""
 
 			"""

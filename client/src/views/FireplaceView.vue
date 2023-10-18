@@ -1,86 +1,116 @@
 <script setup lang="ts">
 import SvgIcon from '@jamescoyle/vue-icon';
 import { mdiThermometer, mdiCog, mdiPlus, mdiMinus } from '@mdi/js';
-import { ref, onMounted } from 'vue'
-//import * as mqtt from 'mqtt';
-import * as mqtt from 'mqtt/dist/mqtt.min'
+import { ref, reactive, onMounted } from 'vue';
+import axios from 'axios';
 
-import { Fireplace } from '../drawings/fireplace';
+import { Fireplace } from '../services/fireplace';
+import { onMessage } from '../services/mqtt';
 
-const settings = [
-	{ 'key': 't_relais_on', 'label': 'Relay ON', 'value': 40, 'unit': '°' },
-	{ 'key': 't_relais_off', 'label': 'Relay OFF', 'value': 70, 'unit': '°' },
-	{ 'key': 't_air_intake_close_half', 'label': 'Half close air intake', 'value': 35, 'unit': '°' },
-	{ 'key': 't_air_intake_close', 'label': 'Full close air intake', 'value': 45, 'unit': '°' },
-	{ 'key': 't_air_intake_open', 'label': 'Open air intake', 'value': 65, 'unit': '°' },
-	{ 'key': 'air_intake_opening_at_full_burn', 'label': 'Opening at full close', 'value': 0, 'unit': '%' }
-]
+const settings = reactive({
+	't_relais_on': { 'label': 'Relay ON', 'value': 0, 'unit': '°', 'isUpdating': false },
+	't_relais_off': { 'label': 'Relay OFF', 'value': 0, 'unit': '°', 'isUpdating': false },
+	't_air_intake_close_half': { 'label': 'Half close air intake', 'value': 0, 'unit': '°', 'isUpdating': false },
+	't_air_intake_close': { 'label': 'Full close air intake', 'value': 0, 'unit': '°', 'isUpdating': false },
+	't_air_intake_open': { 'label': 'Open air intake', 'value': 0, 'unit': '°', 'isUpdating': false },
+	'air_intake_opening_at_full_burn': { 'label': 'Opening at full close', 'value': 0, 'unit': '%', 'isUpdating': false }
+});
 
-// TODO get values from nodejs server
-// Rather use mqtt instead of http? just for the case that another interface changes values?
-
+// This flag is used to indicate which tab is opened (Status / Settings)
 let isSetting = ref(false);
 
 // Get canvas element from DOM
 const canvas = ref('canvas');
 
+/**
+ * Get profile values from server and update settings values
+ */
+async function updateSettingsValuesFromServer() {
+	axios.get('http://192.168.1.74:4000/profile').then((res) => {
+		for (const key in settings) {
+			settings[key].value = res.data[key]
+		}
+	});
+}
+
+/**
+ * Publish new profile value via the MQTT client
+ * 
+ * @param {string} key Key of the profile parameter
+ * @param {string|number} newValue Updated value of the profile parameter
+ */
+function publishNewValue(key, newValue) {
+
+	// Check if we are allow to edit
+	if (settings[key].isUpdating) return;
+
+	// Check if value exceeds limits
+	if (newValue < 0 || newValue > 100) return;
+
+	// Deactivate form for specific parameter
+	settings[key].isUpdating = true;
+
+	// Send key/value to nodejs server
+	// The nodejs server then sends the new value via MQTT
+	const data = { 'key': key, 'value': newValue };
+	axios.patch('http://192.168.1.74:4000/profile', data).catch((err) => {
+		setTimeout(() => {
+			settings[key].isUpdating = false;
+		}, 100);
+	});
+}
+
+onMessage('fireplace/parameter', (message) => {
+	// Parse message from event details
+	const p = JSON.parse(message);
+	// Update value
+	settings[p.key].value = p.value;
+	// Activate form, wait at least some milliseconds to make it look nice
+	setTimeout(() => {
+		settings[p.key].isUpdating = false;
+	}, 100);
+});
+
+onMessage('fireplace/temperature', (message) => {
+	fireplace.setTemperatureFireplace(message);
+});
+
+onMessage('fireplace/servo', (message) => {
+	fireplace.setServoOpening(message);
+});
+
+onMessage('fireplace/pump', (message) => {
+	if (message == 0) {
+		fireplace.stopPump();
+	} else {
+		fireplace.startPump();
+	}
+});
+
+onMessage('fireplace/heating_state', (message) => {
+	if (message == 0) {
+		fireplace.isCooling();
+	} else {
+		fireplace.isHeating();
+	}
+});
+
+onMessage('buffertank/temperature/top', (message) => {
+	fireplace.setTemperatureTankTop(message);
+});
+
+onMessage('buffertank/temperature/bottom', (message) => {
+	fireplace.setTemperatureTankBottom(message);
+});
+
 onMounted(async () => {
+	// Init fireplace
 	const fireplace = new Fireplace(canvas.value);
 	await fireplace.build();
 
-	/*fireplace.setTemperatureFireplace(50);
-	fireplace.setTemperatureTankAbove(70);
-	fireplace.setTemperatureTankBelow(30);
-
-	setTimeout(() => {
-		fireplace.isHeating();
-	}, 2000);
-
-	setTimeout(() => {
-		fireplace.startPump();
-	}, 6000);*/
-
-	// Init mqtt
-	const options = {
-		keepalive: 60,
-		clientId: 'screen'
-	}
-	let client = mqtt.connect('ws://192.168.1.74:9001', options);
-
-	client.on("connect", () => {
-		client.subscribe("temperature/fireplace", (err) => {
-			if (!err) {
-				console.log('subscribed');
-			}
-		});
-	});
-
-	client.on("message", (topic, message) => {
-		console.log(topic);
-		console.log(message);
-		console.log(message.toString());
-		if (topic == 'temperature/fireplace') {
-			fireplace.setTemperatureFireplace(message.toString())
-		}
-		if (topic == 'temperature/tank_top') {
-			fireplace.setTemperatureTankTop(message.toString())
-		}
-		if (topic == 'temperature/tank_bottom') {
-			fireplace.setTemperatureTankBottom(message.toString())
-		}
-		if (topic == 'temperature/room') {
-			// TODO
-		}
-		if (topic == 'servo/fireplace') {
-			// TODO
-		}
-		if (topic == 'pump/fireplace') {
-			// TODO
-		}
-		//client.end();
-	});
+	// Get profile from server and store in settings
+	updateSettingsValuesFromServer();
 });
-
 </script>
 
 <template>
@@ -88,16 +118,18 @@ onMounted(async () => {
 		<section class="status" v-show="!isSetting">
 			<canvas id="canvas" ref="canvas" resize></canvas>
 		</section>
-		<section class="setting" v-show="isSetting">
-			<div class="setting-row" v-for="s in settings">
-				<a @click="">
-					<svg-icon class="icon" type="mdi" :path="mdiMinus"></svg-icon>
-				</a>
-				<span class="value">{{ s.value }}{{ s.unit }}</span>
-				<a @click="">
-					<svg-icon class="icon" type="mdi" :path="mdiPlus"></svg-icon>
-				</a>
-				<span class="label">{{ s.label }}</span>
+		<section class="setting-wrapper" v-show="isSetting">
+			<div class="setting">
+				<div class="setting-row" :class="{ 'updating': s.isUpdating }" v-for="(s, key) in settings">
+					<a @click="publishNewValue(key, s.value-1)">
+						<svg-icon class="icon" type="mdi" :path="mdiMinus"></svg-icon>
+					</a>
+					<span class="value">{{ s.value }}{{ s.unit }}</span>
+					<a @click="publishNewValue(key, s.value+1)">
+						<svg-icon class="icon" type="mdi" :path="mdiPlus"></svg-icon>
+					</a>
+					<span class="label">{{ s.label }}</span>
+				</div>
 			</div>
 		</section>
 	</div>
@@ -163,13 +195,24 @@ a {
 	background-color: var(--black-highlight);
 }
 
+.setting-wrapper {
+	text-align: center;
+}
+
 .setting {
+	display: inline-block;
 	padding: 30px;
+	margin: 0 auto;
 }
 
 .setting-row {
 	display: flex;
 	margin-bottom: 10px;
+	opacity: 1;
+}
+
+.setting-row.updating {
+	opacity: 0.5;
 }
 
 .setting .value {
@@ -191,5 +234,13 @@ a {
 	color: var(--white);
 	background-color: var(--black-highlight);
 	padding: 5px;
+}
+
+.setting a.soft {
+	background-color: var(--black-soft);
+}
+
+.setting a.soft .icon {
+	color: var(--grey-500);
 }
 </style>

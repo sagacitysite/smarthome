@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 
 // Import own objects
 import { Profile } from './profile.js';
+import { client } from './mqtt.js';
 
 // Initialize express app
 const app = express();
@@ -16,57 +17,49 @@ app.use(function (req, res, next) {
 	next();
 });
 
+// JSON Parser for post requests
+const jsonParser = bodyParser.json()
+
 // Instantiate profile
 const profile = new Profile();
 
-/**
- * Send the selected profile to the client
- * 
- * @param {*} req
- * @param {*} res
- */
-function getProfileValues(req, res) {
-	res.send(profile.getValues());
-}
+// Used from Python control script, get the currently selected profile
+// Takes into accont overwritten values
+app.get('/profile', (req, res) => {
+	res.send(profile.getValues())
+});
 
-
-/**
- * Change value from selected profile
- * 
- * @param {*} req
- * @param {*} res
- */
-function updateProfileValue (req, res) {
+// Used from frontend to overwrite profile values
+app.patch('/profile', jsonParser, (req, res) => {
 	// Get key and value from profile to update
 	const key = req.body.key;
 	const value = req.body.value;
 
 	// Update value in profile and get status
-	const status = profile.updateValue(key, value);
+	const wasSuccessful = profile.updateValue(key, value);
 
-	// Set status for response
-	res.status(status);
-
-	// Add messages, depending on status code
-	if (status == 200) {
+	if (wasSuccessful) {
+		// If update was successful, publish profile vaue to all subscribers
+		const parameter = JSON.stringify({ 'key': key, 'value': value });
+		client.publish('fireplace/parameter', parameter, { 'qos': 2 });
+		// Send ok to client
 		res.send('OK');
-	}
-	else if (status == 400) {
+	} else {
+		res.status(400);
 		res.send('Key not found in profile.');
 	}
-}
-
-
-// JSON Parser for post requests
-const jsonParser = bodyParser.json()
-
-// Used from Python control script, get the currently selected profile
-// Takes into accont overwritten values
-app.get('/profile', getProfileValues);
-
-// Used from frontend to overwrite profile values
-app.patch('/profile', jsonParser, updateProfileValue);
+});
 
 // Start server
 const port = 4000;
 app.listen(port, () => console.log(`The server is listening on port ${port}.`));
+
+// Disconnect MQTT client before exit
+// Source: https://stackoverflow.com/a/49392671/2692283
+const exitConditioons = [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`];
+exitConditioons.forEach((eventType) => {
+	process.on(eventType, (eventType) => {
+		client.end();
+		process.exit();
+	});
+});

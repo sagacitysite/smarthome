@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router';
 import Menu from './components/menu/Menu.vue';
+import { startMqttClient } from './services/mqtt';
+
+// Start mqtt client
+startMqttClient();
+
 </script>
 
 <template>
 	<main>
-		<RouterView />
+		<router-view v-slot="{ Component }">
+			<keep-alive include="FireplaceView">
+				<component :is="Component" />
+			</keep-alive>
+		</router-view>
 	</main>
 
 	<div id="menu">

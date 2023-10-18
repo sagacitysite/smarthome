@@ -12,7 +12,9 @@
   "dependencies": {
     "@jamescoyle/vue-icon": "^0.1.2",
     "@mdi/js": "^7.3.67",
+    "@types/mqtt": "^2.5.0",
     "@types/paper": "^0.12.3",
+    "axios": "^1.5.1",
     "mqtt": "^5.1.2",
     "paper": "^0.12.17",
     "pinia": "^2.1.6",
