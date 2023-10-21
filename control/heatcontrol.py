@@ -4,7 +4,7 @@ from time import sleep
 
 from air_intake_servo import AirIntakeServoMotor
 from temperature_sensors import TemperatureSensors
-from pump_relay import FireplacePumpRelay
+from relay import Relay
 from mqtt import MqttClient
 
 # TODO
@@ -28,7 +28,7 @@ class Heatcontrol(Thread):
 		self.servo = AirIntakeServoMotor()
 
 		# Instantiate pump relay
-		self.pump = FireplacePumpRelay
+		self.pump = Relay(22)
 
 		# Define a flag that indicates a running thread
 		self.is_running = True
@@ -49,19 +49,26 @@ class Heatcontrol(Thread):
 		self.interval = 10
 
 		# Define after how many intervals the sensors/actuators are evaluated
+		# The final interval in seconds calculates as interval_count x interval
 		self.interval_count_sensors = 1
 		self.interval_count_actuators = 6
-		self.interval_count_servo_refresh = 60
 
 		# Get parameters from server
 		self.profile = self.get_profile()
 		print('self.profile', self.profile)
 
-		# Add profile dict to MQTT client which can then update values
-		self.client.add_object('profile', self.profile)
-
-		# Subscribe to changes of fireplace parameters
+		# Subscribe to changes of fireplace parameters and add a callback function
+		# that is called if an MQTT message arrives
 		self.client.subscribe('fireplace/parameter', qos=2)
+		self.client.on_message('fireplace/parameter', self.on_fireplace_parameter)
+
+
+	def on_fireplace_parameter(self, message):
+		"""
+		When a fireplace parameter is published from MQTT, update the value in the profile
+		"""
+		self.profile[message.key] = message.value
+		print('self.profile', self.profile)
 
 
 	def get_profile(self):
@@ -127,9 +134,9 @@ class Heatcontrol(Thread):
 		self.client.publish(f'fireplace/servo', opening, qos=2)
 
 
-	def switch_relais(self, state):
+	def switch_pump_relay(self, state):
 		"""
-		Switch relais (on/off) and publish to mqtt broker
+		Switch pump relay (on/off) and publish to mqtt broker
 		"""
 		self.pump.set_state(state)
 		self.client.publish(f'fireplace/pump', state, qos=2)
@@ -138,20 +145,29 @@ class Heatcontrol(Thread):
 	def evaluate_and_update_actuators(self):
 		"""
 		Update actuator values:
-		* Pump relais
+		* Pump relay
 		* Servo motor for air intake
 		"""
 		# Shorthand for profile values
 		p = self.profile
 
-		# Switch ON relais
-		if self.t_fireplace >= p.t_relais_on and self.is_heating:
-			self.switch_relais(1)
+		# Switch ON pump relay
+		if (
+				not self.pump.is_open and
+				self.t_fireplace >= p.t_relais_on and
+				self.is_heating
+			):
+			self.switch_pump_relay(True)
 
-		# Switch OFF relais
+		# Switch OFF pump relay
 		# TODO improve with exhaust temperature for cases where buffer is hotter than 73 degree
-		if (self.t_fireplace <= p.t_relais_off and self.is_cooling): # or self.t_exhaust < xx:
-			self.switch_relais(0)
+		if (
+				self.pump.is_open and
+				self.t_fireplace <= p.t_relais_off and
+				self.is_cooling
+				# or self.t_exhaust < xx
+		):
+			self.switch_pump_relay(False)
 
 		# Close air intake half when we're heating up
 		if (
@@ -160,6 +176,7 @@ class Heatcontrol(Thread):
 				self.t_fireplace < p.t_air_intake_close and
 				self.is_heating
 			):
+			self.servo.state_air_intake = self.servo.INTAKE_CLOSE_HALF
 			self.adjust_air_opening(50)
 
 		# Close air intake when we're heating up
@@ -168,6 +185,7 @@ class Heatcontrol(Thread):
 				self.t_fireplace >= p.t_air_intake_close and
 				self.is_heating
 			):
+			self.servo.state_air_intake = self.servo.INTAKE_CLOSE
 			self.adjust_air_opening(p.air_intake_opening_at_full_burn)
 
 		# Open air intake when we're cooling down
@@ -176,6 +194,7 @@ class Heatcontrol(Thread):
 				self.t_fireplace <= p.t_air_intake_open and
 				self.is_cooling
 			):
+			self.servo.state_air_intake = self.servo.INTAKE_OPEN
 			self.adjust_air_opening(100)
 
 
@@ -193,14 +212,8 @@ class Heatcontrol(Thread):
 			"""
 			# Execute every twelvth interval
 			# NOTE Don't update actuators when servos are refreshed
-			if counter % self.interval_count_actuators == 0 and counter % self.interval_count_servo_refresh != 0:
+			if counter % self.interval_count_actuators == 0:
 				self.evaluate_and_update_actuators()
-			"""
-
-			"""
-			# Refresh servo
-			if counter % self.interval_count_servo_refresh == 0:
-				self.adjust_air_opening(self.servo.state_air_intake)
 			"""
 
 			# Wait until next interval
@@ -208,7 +221,7 @@ class Heatcontrol(Thread):
 
 			# Update counter, reset after latest interval count
 			counter += 1
-			if counter % self.interval_count_servo_refresh == 0:
+			if counter % self.interval_count_actuators == 0:
 				counter = 0
 
 
