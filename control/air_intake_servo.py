@@ -19,7 +19,7 @@ class AirIntakeServoMotor():
 
 		# Delay in seconds after relay was opened and before position is changed
 		# and before relay is closed and after position was changed
-		self.relay_delay = 0.25
+		self.relay_delay = 0.5
 
 		# Duty values for servo control
 		self.duty_open = 7.75
@@ -45,6 +45,7 @@ class AirIntakeServoMotor():
 		# Initliaize and start servo PWM control
 		self.servo = GPIO.PWM(servo_PIN, pwm_frequency)
 		self.servo.start(0)
+		self.adjust_air_opening(self.air_intake_opening)
 
 
 	def stop(self):
@@ -58,7 +59,6 @@ class AirIntakeServoMotor():
 		"""
 		Calculate duty from percantage value
 		"""
-
 		return self.duty_closed + self.duty_hundredth*percentage
 
 
@@ -71,7 +71,7 @@ class AirIntakeServoMotor():
 		self.air_intake_opening = percentage
 
 		# Calculate duty from opening percentage
-		duty = get_duty_from_percentage(percentage)
+		duty = self.get_duty_from_percentage(percentage)
 
 		# Open relay
 		self.relay.open()
@@ -80,7 +80,7 @@ class AirIntakeServoMotor():
 		# Adjust servo to given position
 		self.servo.ChangeDutyCycle(duty)
 		# Wait some time to make sure that the final position is reached
-		sleep(self.delay)
+		sleep(self.servo_delay)
 		# Stop servo activiy
 		self.servo.ChangeDutyCycle(0)
 

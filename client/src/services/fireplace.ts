@@ -61,8 +61,6 @@ export class Fireplace {
 
 		// Draw flow and pump
 		this.flow.pump = await this.drawFlowAndPumpAsync();
-
-		this.isHeating();
 	}
 
 	isHeating() {
@@ -155,7 +153,7 @@ export class Fireplace {
 	drawFireplaceAirIntake() {
 		return new paper.PointText({
 			point: [this.ct.x-150-18, this.ct.y+75],
-			content: '00%',
+			content: '100%',
 			style: this.textStyle
 		});
 	}

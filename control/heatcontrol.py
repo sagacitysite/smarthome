@@ -1,4 +1,5 @@
 import requests
+import json
 from threading import Thread
 from time import sleep
 
@@ -34,7 +35,8 @@ class Heatcontrol(Thread):
 		self.is_running = True
 
 		# Variable to store current fireplace temperature
-		self.t_fireplace = 0
+		# Init with actual temperature
+		self.t_fireplace = self.sensors.get_temperature('fireplace')
 
 		# Counting variables to count up/down a succession of
 		# temperature increases/decreases
@@ -43,7 +45,7 @@ class Heatcontrol(Thread):
 
 		# Flags indicating if fireplace is heating or cooling
 		self.is_heating = False
-		self.is_cooling = False
+		self.is_cooling = True
 
 		# Define interval length in seconds
 		self.interval = 10
@@ -55,6 +57,7 @@ class Heatcontrol(Thread):
 
 		# Get parameters from server
 		self.profile = self.get_profile()
+		self.has_changed = []  # Array to indicate profile value that have recently changed
 		print('self.profile', self.profile)
 
 		# Subscribe to changes of fireplace parameters and add a callback function
@@ -63,12 +66,14 @@ class Heatcontrol(Thread):
 		self.client.on_message('fireplace/parameter', self.on_fireplace_parameter)
 
 
-	def on_fireplace_parameter(self, message):
+	def on_fireplace_parameter(self, message_as_string):
 		"""
 		When a fireplace parameter is published from MQTT, update the value in the profile
 		"""
-		self.profile[message.key] = message.value
-		print('self.profile', self.profile)
+		message = json.loads(message_as_string)
+		self.profile[message['key']] = message['value']
+		# Store changed key
+		self.has_changed.appned(message['key'])
 
 
 	def get_profile(self):
@@ -105,7 +110,7 @@ class Heatcontrol(Thread):
 				# Update object's fireplace temperature
 				self.t_fireplace = temp
 
-		# Evaluate if fireplace temperature has increased of decreased
+		# Evaluate if fireplace temperature has increased or decreased
 		if int(self.t_fireplace) < int(t_fireplace_previous):  # Lower than before
 			self.count_up = 0  # Reset count up
 			self.count_down += 1  # Increase count down
@@ -115,13 +120,13 @@ class Heatcontrol(Thread):
 
 		# If we count sufficiently up, we switch from cooling to heating state
 		if self.is_cooling and self.count_up >= 3:
-			self.client.publish(f'fireplace/heating_state', True, qos=2)
+			self.client.publish(f'fireplace/heating_state', 1, qos=2)
 			self.is_cooling = False
 			self.is_heating = True
 		
 		# If we count sufficiently down, we switch from heating to cooling state
 		if self.is_heating and self.count_down >= 3:
-			self.client.publish(f'fireplace/heating_state', False, qos=2)
+			self.client.publish(f'fireplace/heating_state', 0, qos=2)
 			self.is_cooling = True
 			self.is_heating = False
 
@@ -139,7 +144,7 @@ class Heatcontrol(Thread):
 		Switch pump relay (on/off) and publish to mqtt broker
 		"""
 		self.pump.set_state(state)
-		self.client.publish(f'fireplace/pump', state, qos=2)
+		self.client.publish(f'fireplace/pump', int(state), qos=2)
 
 
 	def evaluate_and_update_actuators(self):
@@ -153,27 +158,49 @@ class Heatcontrol(Thread):
 
 		# Switch ON pump relay
 		if (
-				not self.pump.is_open and
-				self.t_fireplace >= p.t_relais_on and
-				self.is_heating
+				# Default case
+				(
+					self.is_heating and
+					not self.pump.is_open and
+					self.t_fireplace >= p['t_relais_on']
+				) or
+				# If t_relais_off value has changed to a lower value, we possibly need
+				# to switch on the pump again in the current cycle
+				(
+					't_relais_off' in self.has_changed and
+					self.is_cooling and
+					not self.pump.is_open and
+					self.t_fireplace > p['t_relais_off']
+				)
 			):
 			self.switch_pump_relay(True)
 
 		# Switch OFF pump relay
 		# TODO improve with exhaust temperature for cases where buffer is hotter than 73 degree
 		if (
-				self.pump.is_open and
-				self.t_fireplace <= p.t_relais_off and
-				self.is_cooling
-				# or self.t_exhaust < xx
+				# Default case
+				(
+					self.is_cooling and
+					self.pump.is_open and
+					self.t_fireplace <= p['t_relais_off']
+					# or self.t_exhaust < xx
+				) or
+				# If t_relais_on value has changed to a higher value, we possibly need
+				# to switch off the pump again in the current cycle
+				(
+					't_relais_on' in self.has_changed and
+					self.is_heating and
+					self.pump.is_open and
+					self.t_fireplace < p['t_relais_on']
+				)
 		):
 			self.switch_pump_relay(False)
 
 		# Close air intake half when we're heating up
 		if (
 				self.servo.state_air_intake != self.servo.INTAKE_CLOSE_HALF and
-				self.t_fireplace >= p.t_air_intake_close_half and
-				self.t_fireplace < p.t_air_intake_close and
+				self.t_fireplace >= p['t_air_intake_close_half'] and
+				self.t_fireplace < p['t_air_intake_close'] and
 				self.is_heating
 			):
 			self.servo.state_air_intake = self.servo.INTAKE_CLOSE_HALF
@@ -182,16 +209,16 @@ class Heatcontrol(Thread):
 		# Close air intake when we're heating up
 		if (
 				self.servo.state_air_intake != self.servo.INTAKE_CLOSE and
-				self.t_fireplace >= p.t_air_intake_close and
+				self.t_fireplace >= p['t_air_intake_close'] and
 				self.is_heating
 			):
 			self.servo.state_air_intake = self.servo.INTAKE_CLOSE
-			self.adjust_air_opening(p.air_intake_opening_at_full_burn)
+			self.adjust_air_opening(p['air_intake_opening_at_full_burn'])
 
 		# Open air intake when we're cooling down
 		if (
 				self.servo.state_air_intake != self.servo.INTAKE_OPEN and
-				self.t_fireplace <= p.t_air_intake_open and
+				self.t_fireplace <= p['t_air_intake_open'] and
 				self.is_cooling
 			):
 			self.servo.state_air_intake = self.servo.INTAKE_OPEN
@@ -202,19 +229,15 @@ class Heatcontrol(Thread):
 		"""
 		Run infinite loop, read sensor data and control motor/relay
 		"""
-		print('heatcontrol running')
 		counter = 0
 		while self.is_running:
 			# Execute every interval
 			if counter % self.interval_count_sensors == 0:
 				self.update_and_evaluate_sensors()
 
-			"""
 			# Execute every twelvth interval
-			# NOTE Don't update actuators when servos are refreshed
-			if counter % self.interval_count_actuators == 0:
+			if counter % 1 == 0: #self.interval_count_actuators == 0:
 				self.evaluate_and_update_actuators()
-			"""
 
 			# Wait until next interval
 			sleep(self.interval)

@@ -15,6 +15,7 @@ def cleanup():
 	"""
 	Run cleanup commands, e.g. stop threads, GPIO cleanup
 	"""
+	print('Cleaning up ...')
 	heatcontrol.stop()
 	GPIO.cleanup()
 

@@ -31,6 +31,7 @@ export function startMqttClient() {
 
 	// On connect, add subscriptions
 	client.on('connect', () => {
+		console.log('connect');
 		for (const topic of subscriptions) {
 			if (topic.startsWith('fireplace')) {
 				client.subscribe(topic, { 'qos': 2 });
@@ -66,6 +67,7 @@ export function startMqttClient() {
  * instead of the pure event
  */
 export function onMessage(topic: string, cb: Function) {
+	console.log('onMessage', topic);
 	const target = eventTargets[topic];
 	target.addEventListener(topic, (event: CustomEvent) => {
 		cb(event.detail.message);

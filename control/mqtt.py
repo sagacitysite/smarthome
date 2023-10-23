@@ -1,6 +1,7 @@
 #import asyncio
 #import signal
 #from gmqtt import Client as Mqtt
+from events import Events
 from paho.mqtt.client import Client as Mqtt
 
 class MqttClient():
@@ -43,15 +44,13 @@ class MqttClient():
 
 
 	def publish(self, topic, message, qos=1):
-		print('publish', topic, message)
 		self.mqtt.publish(topic, message, qos)
 
 
-	def subscribe(self, topic, cb, qos=1):
+	def subscribe(self, topic, qos=1):
 		"""
 		Subcribes a new topic to MQTT and adds an event for the topic 
 		"""
-		print('subscribe', topic, qos)
 		if topic not in self.events:
 			self.add_event(topic)
 			self.mqtt.subscribe(topic, qos=qos)
@@ -65,31 +64,31 @@ class MqttClient():
 		target.on_change += cb
 
 
-	def on_mqtt_connect(self, client, flags, rc, properties):
+	def on_mqtt_connect(self, client, userdata, flags, rc):
 		"""
 		Called when MQTT is connected
 		"""
 		print('connected')
 
 
-	def on_mqtt_message(self, client, topic, payload, qos, properties):
+	def on_mqtt_message(self, client, userdata, msg):
 		"""
 		Called when MQTT receives a message
 		"""
-		print('message reveived', payload)
+		message = msg.payload.decode()
 		# Triggers the event of the specific topic and hands over the payload
-		target = self.events[topic]
-		target.on_change(payload)
+		target = self.events[msg.topic]
+		target.on_change(message)
 
 
-	def on_mqtt_disconnect(self, client, packet, exc=None):
+	def on_mqtt_disconnect(self, client, userdata, rc):
 		"""
 		Called when MQTT disconnects
 		"""
 		pass
 
 
-	def on_mqtt_subscribe(self, client, mid, qos, properties):
+	def on_mqtt_subscribe(self, client, userdata, mid, granted_qos):
 		"""
 		Called when MQTT subscription was added
 		"""

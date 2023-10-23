@@ -16,6 +16,9 @@ const settings = reactive({
 	'air_intake_opening_at_full_burn': { 'label': 'Opening at full close', 'value': 0, 'unit': '%', 'isUpdating': false }
 });
 
+// Variable to store fireplace graphic object
+let fireplace;
+
 // This flag is used to indicate which tab is opened (Status / Settings)
 let isSetting = ref(false);
 
@@ -72,15 +75,18 @@ onMessage('fireplace/parameter', (message) => {
 });
 
 onMessage('fireplace/temperature', (message) => {
+	console.log('on', 'fireplace/temperature', message);
 	fireplace.setTemperatureFireplace(message);
 });
 
 onMessage('fireplace/servo', (message) => {
+	console.log('on', 'fireplace/servo', message);
 	fireplace.setServoOpening(message);
 });
 
 onMessage('fireplace/pump', (message) => {
-	if (message == 0) {
+	console.log('on', 'fireplace/pump', message);
+	if (parseInt(message) == 0) {
 		fireplace.stopPump();
 	} else {
 		fireplace.startPump();
@@ -88,7 +94,8 @@ onMessage('fireplace/pump', (message) => {
 });
 
 onMessage('fireplace/heating_state', (message) => {
-	if (message == 0) {
+	console.log('on', 'fireplace/heating_state', message);
+	if (parseInt(message) == 0) {
 		fireplace.isCooling();
 	} else {
 		fireplace.isHeating();
@@ -105,7 +112,7 @@ onMessage('buffertank/temperature/bottom', (message) => {
 
 onMounted(async () => {
 	// Init fireplace
-	const fireplace = new Fireplace(canvas.value);
+	fireplace = new Fireplace(canvas.value);
 	await fireplace.build();
 
 	// Get profile from server and store in settings
