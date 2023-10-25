@@ -64,6 +64,26 @@ app.patch('/fireplace/state', jsonParser, (req, res) => {
 	// Update parameter value in profile and get status
 	const wasSuccessful = fireplace.updateState(key, value);
 
+	// Handle boost timing
+	if (key =='boost') {
+		if (parseInt(value) == 1) {
+			// Define timestamp when boost has started
+			fireplace.boost.started = Date.now();
+			// Start timeout to know when boost has finished
+			fireplace.boost.timeout = setTimeout(() => {
+				// Send finished boost to all clients
+				client.publish('fireplace/boost', '0');
+				// Cleanup
+				clearTimeout(fireplace.boost.timeout);
+				fireplace.boost.started = -1;
+			}, fireplace.boost.duration*1000);
+		} else if (parseInt(value) == 0) {
+			// Cleanup
+			clearTimeout(fireplace.boost.timeout);
+			fireplace.boost.started = -1;
+		}
+	}
+
 	if (wasSuccessful) {
 		// If update was successful, publish state value to all subscribers
 		client.publish(`fireplace/${key}`, value);
@@ -73,6 +93,10 @@ app.patch('/fireplace/state', jsonParser, (req, res) => {
 		res.status(400);
 		res.send('Key not found in fireplace state.');
 	}
+});
+
+app.get('/fireplace/boost/time', (req, res) => {
+	res.send({ 'boostTime': fireplace.getBoostTime() });
 });
 
 // Start server

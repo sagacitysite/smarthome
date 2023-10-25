@@ -21,7 +21,6 @@ const settings = reactive({
 let fireplace;
 
 // Boost
-const boostSeconds = 3;
 let isBoost = ref(false);
 let boostLabel = ref('Boost');
 let boostTimer;
@@ -79,36 +78,6 @@ async function getStateValuesFromServer() {
 	});
 }
 
-function updateState(topic, state) {
-	if (topic == 'fireplace/temperature') {
-		fireplace.setTemperatureFireplace(state);
-	}
-
-	if (topic == 'fireplace/servo') {
-		fireplace.setServoOpening(state);
-	}
-
-	if (topic == 'fireplace/pump') {
-		if (parseInt(state) == 0) {
-			fireplace.stopPump();
-		} else {
-			fireplace.startPump();
-		}
-	}
-
-	if (topic == 'fireplace/heating_state') {
-		if (parseInt(state) == 0) {
-			fireplace.isCooling();
-		} else {
-			fireplace.isHeating();
-		}
-	}
-
-	if (topic == 'fireplace/boost') {
-		console.log(topic, state);
-	}
-}
-
 /**
  * Publish new profile value via the MQTT client
  * 
@@ -136,6 +105,12 @@ function patchParameter(key, newValue) {
 	});
 }
 
+/**
+ * Publish new fireplace state value via the MQTT client
+ * 
+ * @param {string} key Key of the state
+ * @param {string|number} newValue Updated value of the state
+ */
 function patchState(key, newValue) {
 	// Send key/value to nodejs server
 	// The nodejs server then sends the new value via MQTT
@@ -143,44 +118,81 @@ function patchState(key, newValue) {
 	patch('/fireplace/state', data);
 }
 
-function clearBoost() {
-	clearInterval(boostTimer);
-	patchState('boost', '0');
-	isBoost.value = false;
-	boostLabel.value = 'Boost';
-}
-
-function boost() {
+function sendBoost() {
 	if (isBoost.value) {
-		// If Boost is already active, stop timer and Boost
-		clearBoost();
-	}
-	else {
-		// If Boost is not active, start it and stop it automaticall after 3 minutes
+		patchState('boost', '0');
+	} else {
 		patchState('boost', '1');
-		isBoost.value = true;
-		let seconds = boostSeconds;
-		boostTimer = setInterval(() => {
-			if (seconds == 0) {
-				clearBoost();
-			} else {
-				let m = formatTime(parseInt(seconds / 60));
-				let s = formatTime(seconds % 60);
-				boostLabel.value = `${m}:${s}`;
-			}
-			seconds -= 1;
-		}, 1000);
 	}
 }
 
-function final() {
-	console.log('final', isFinal.value);
+function sendFinal() {
 	if (isFinal.value) {
-		client.publish('fireplace/final', '0');
-		isFinal.value = false;
+		patchState('final', '0');
 	} else {
-		client.publish('fireplace/final', '1');
-		isFinal.value = true;
+		patchState('final', '1');
+	}
+}
+
+function updateState(topic, state) {
+	if (topic == 'fireplace/temperature') {
+		fireplace.setTemperatureFireplace(state);
+	}
+
+	if (topic == 'fireplace/servo') {
+		fireplace.setServoOpening(state);
+	}
+
+	if (topic == 'fireplace/pump') {
+		if (parseInt(state) == 0) {
+			fireplace.stopPump();
+		} else {
+			fireplace.startPump();
+		}
+	}
+
+	if (topic == 'fireplace/heating_state') {
+		if (parseInt(state) == 0) {
+			fireplace.isCooling();
+		} else {
+			fireplace.isHeating();
+		}
+	}
+
+	if (topic == 'fireplace/boost') {
+		// Parse state value to integer
+		state = parseInt(state);
+		console.log(topic, state);
+
+		if (state == 0) {
+			clearInterval(boostTimer);
+			isBoost.value = false;
+			boostLabel.value = 'Boost';
+		} else {
+			isBoost.value = true;
+			get('/fireplace/boost/time').then((res) => {
+				console.log(res.data);
+				let seconds = res.data.boostTime;
+				boostTimer = setInterval(() => {
+					if (seconds == 0) clearInterval(boostTimer);
+					let m = formatTime(parseInt(seconds / 60));
+					let s = formatTime(seconds % 60);
+					boostLabel.value = `${m}:${s}`;
+					seconds -= 1;
+				}, 1000);
+			});
+		}
+	}
+
+	if (topic == 'fireplace/final') {
+		console.log(topic, state);
+		// Parse state value to integer
+		state = parseInt(state);
+		if (state == 0) {
+			isFinal.value = false;
+		} else {
+			isFinal.value = true;
+		}
 	}
 }
 
@@ -212,10 +224,10 @@ onMounted(async () => {
 		<section class="status" v-show="!isSetting">
 			<canvas id="canvas" ref="canvas" resize></canvas>
 			<div class="manual-control">
-				<a @click="boost()" :class="{ 'active': isBoost }">
+				<a @click="sendBoost()" :class="{ 'active': isBoost }">
 					<svg-icon class="icon icon-margin" type="mdi" :path="mdiRocketLaunch"></svg-icon> <span>{{ boostLabel }}</span>
 				</a>
-				<a @click="final()" :class="{ 'active': isFinal }">
+				<a @click="sendFinal()" :class="{ 'active': isFinal }">
 					<svg-icon class="icon icon-margin" type="mdi" :path="mdiWeatherDust"></svg-icon> <span>Final</span>
 				</a>
 			</div>

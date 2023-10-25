@@ -19,9 +19,20 @@ export class Fireplace {
 			'final': 0
 		};
 
-		this.extendedState = {
-			'boostTimer': 0
+		this.boost = {
+			'started': -1,
+			'duration': 10,  // Seconds
+			'timeout': undefined
 		}
+	}
+
+	/**
+	 * Returns remaining time for fireplace boost
+	 * 
+	 * @returns {number}: Remaining time in seconds
+	 */
+	getBoostTime() {
+		return parseInt(this.boost.duration - (Date.now() - this.boost.started)/1000);
 	}
 
 	/**
@@ -56,10 +67,7 @@ export class Fireplace {
 	 * @returns {object} State values
 	 */
 	getState() {
-		return {
-			...this.state,
-			...this.extendedState
-		};
+		return this.state;
 	}
 
 	/**
