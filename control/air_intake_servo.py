@@ -31,9 +31,12 @@ class AirIntakeServoMotor():
 		self.air_intake_opening = 100
 
 		# Variable indicating air intake state
+		self.INTAKE_UNDEFINED = -1
 		self.INTAKE_OPEN = 0
 		self.INTAKE_CLOSE_HALF = 1
 		self.INTAKE_CLOSE = 2
+		self.INTAKE_BOOST = 3
+		self.INTAKE_FINAL = 4
 		self.state_air_intake = self.INTAKE_OPEN
 
 		# Realy for servo

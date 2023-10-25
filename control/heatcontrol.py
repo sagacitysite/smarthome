@@ -65,6 +65,38 @@ class Heatcontrol(Thread):
 		self.client.subscribe('fireplace/parameter', qos=2)
 		self.client.on_message('fireplace/parameter', self.on_fireplace_parameter)
 
+		self.client.subscribe('fireplace/boost')
+		self.client.on_message('fireplace/boost', self.on_fireplace_boost)
+
+		self.client.subscribe('fireplace/final')
+		self.client.on_message('fireplace/final', self.on_fireplace_final)
+
+
+	def on_fireplace_final(self, message_as_string):
+		print(message_as_string)
+		# TODO
+		"""
+		state = int(message_as_string)
+		if state == 0:
+			self.servo.state_air_intake = self.INTAKE_OPEN	
+		elif state == 1:
+			self.servo.state_air_intake = self.INTAKE_FINAL
+			self.adjust_air_opening(100)
+		"""
+
+
+	def on_fireplace_boost(self, message_as_string):
+		print(message_as_string)
+		# TODO
+		"""
+		state = int(message_as_string)
+		if state == 0:
+			self.servo.state_air_intake = self.INTAKE_OPEN	
+		elif state == 1:
+			self.servo.state_air_intake = self.INTAKE_BOOST
+			self.adjust_air_opening(100)
+		"""
+
 
 	def on_fireplace_parameter(self, message_as_string):
 		"""
@@ -73,7 +105,7 @@ class Heatcontrol(Thread):
 		message = json.loads(message_as_string)
 		self.profile[message['key']] = message['value']
 		# Store changed key
-		self.has_changed.appned(message['key'])
+		self.has_changed.append(message['key'])
 
 
 	def get_profile(self):
@@ -196,8 +228,29 @@ class Heatcontrol(Thread):
 		):
 			self.switch_pump_relay(False)
 
+		# If one of the air intake temperature parameters has changed, set air intake
+		# state to undefined, which forces a re-evaluation of the conditions below
+		# NOTE The undefined state (and therefore the old fireplace state) remaind,
+		#      until one of the conditions below was met
+		if (
+				't_air_intake_close_half' in self.has_changed or
+				't_air_intake_close' in self.has_changed or
+				't_air_intake_open' in self.has_changed
+			):
+			self.servo.state_air_intake = self.servo.INTAKE_UNDEFINED
+
+		# If the air intake at full burn has changed and we are currently in
+		# closed servo state, adapt the opening to the new parameter value
+		if (
+				'air_intake_opening_at_full_burn' in self.has_changed and
+				self.servo.state_air_intake == self.servo.INTAKE_CLOSE
+			):
+			self.adjust_air_opening(p['air_intake_opening_at_full_burn'])
+
 		# Close air intake half when we're heating up
 		if (
+				self.servo.state_air_intake != self.servo.INTAKE_FINAL and
+				self.servo.state_air_intake != self.servo.INTAKE_BOOST and
 				self.servo.state_air_intake != self.servo.INTAKE_CLOSE_HALF and
 				self.t_fireplace >= p['t_air_intake_close_half'] and
 				self.t_fireplace < p['t_air_intake_close'] and
@@ -208,6 +261,8 @@ class Heatcontrol(Thread):
 
 		# Close air intake when we're heating up
 		if (
+				self.servo.state_air_intake != self.servo.INTAKE_FINAL and
+				self.servo.state_air_intake != self.servo.INTAKE_BOOST and
 				self.servo.state_air_intake != self.servo.INTAKE_CLOSE and
 				self.t_fireplace >= p['t_air_intake_close'] and
 				self.is_heating
@@ -217,12 +272,18 @@ class Heatcontrol(Thread):
 
 		# Open air intake when we're cooling down
 		if (
+				self.servo.state_air_intake != self.servo.INTAKE_BOOST and
 				self.servo.state_air_intake != self.servo.INTAKE_OPEN and
 				self.t_fireplace <= p['t_air_intake_open'] and
 				self.is_cooling
 			):
 			self.servo.state_air_intake = self.servo.INTAKE_OPEN
 			self.adjust_air_opening(100)
+			# If we're cooling down and final burn was active,
+			# inform server that final state ends now
+			if self.servo.state_air_intake == self.servo.INTAKE_FINAL:
+				pass
+				# TODO send '/fireplace/state' 0 via http patch to nodejs server
 
 
 	def run(self):
