@@ -80,7 +80,7 @@ class Heatcontrol(Thread):
 		"""
 		Request profile values from nodejs server
 		"""
-		r = requests.get('http://localhost:4000/profile')
+		r = requests.get('http://localhost:4000/fireplace/profile')
 		
 		if r.status_code == 200:
 			return r.json()
@@ -238,6 +238,8 @@ class Heatcontrol(Thread):
 			# Execute every twelvth interval
 			if counter % 1 == 0: #self.interval_count_actuators == 0:
 				self.evaluate_and_update_actuators()
+				# Clear has_changed array
+				self.has_changed = []
 
 			# Wait until next interval
 			sleep(self.interval)

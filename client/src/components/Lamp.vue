@@ -17,6 +17,7 @@ const props = defineProps<{
 <style scoped>
 p {
 	text-align: center;
+	font-size: 20px;
 }
 
 .icon {

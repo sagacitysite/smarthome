@@ -3,7 +3,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 
 // Import own objects
-import { Profile } from './profile.js';
+import { Fireplace } from './data/fireplace.js';
 import { client } from './mqtt.js';
 
 // Initialize express app
@@ -20,33 +20,58 @@ app.use(function (req, res, next) {
 // JSON Parser for post requests
 const jsonParser = bodyParser.json()
 
-// Instantiate profile
-const profile = new Profile();
+// Instantiate fireplace
+const fireplace = new Fireplace();
 
-// Used from Python control script, get the currently selected profile
+// Used from all clients to get the current profile parameter set
 // Takes into accont overwritten values
-app.get('/profile', (req, res) => {
-	res.send(profile.getValues())
+app.get('/fireplace/profile', (req, res) => {
+	res.send(fireplace.getParameter())
 });
 
-// Used from frontend to overwrite profile values
-app.patch('/profile', jsonParser, (req, res) => {
-	// Get key and value from profile to update
+// Used from frontend to overwrite profile parameter values
+app.patch('/fireplace/profile', jsonParser, (req, res) => {
+	// Get key and value from profile parameter to update
 	const key = req.body.key;
 	const value = req.body.value;
 
-	// Update value in profile and get status
-	const wasSuccessful = profile.updateValue(key, value);
+	// Update parameter value in profile and get status
+	const wasSuccessful = fireplace.updateParameter(key, value);
 
 	if (wasSuccessful) {
-		// If update was successful, publish profile vaue to all subscribers
+		// If update was successful, publish profile value to all subscribers
 		const parameter = JSON.stringify({ 'key': key, 'value': value });
 		client.publish('fireplace/parameter', parameter, { 'qos': 2 });
 		// Send ok to client
 		res.send('OK');
 	} else {
 		res.status(400);
-		res.send('Key not found in profile.');
+		res.send('Key not found in profile parameters.');
+	}
+});
+
+// Used from all clients to get the current fireplace state
+app.get('/fireplace/state', (req, res) => {
+	res.send(fireplace.getState())
+});
+
+// Used from all clients to change the fireplace state
+app.patch('/fireplace/state', jsonParser, (req, res) => {
+	// Get key and value from state to update
+	const key = req.body.key;
+	const value = req.body.value;
+
+	// Update parameter value in profile and get status
+	const wasSuccessful = fireplace.updateState(key, value);
+
+	if (wasSuccessful) {
+		// If update was successful, publish state value to all subscribers
+		client.publish(`fireplace/${key}`, value);
+		// Send ok to client
+		res.send('OK');
+	} else {
+		res.status(400);
+		res.send('Key not found in fireplace state.');
 	}
 });
 

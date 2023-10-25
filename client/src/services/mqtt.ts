@@ -1,44 +1,25 @@
 // @ts-ignore
 import * as mqtt from 'mqtt/dist/mqtt.min';
 
-// List of topic subscriptions
-const subscriptions: string[] = [
-	'fireplace/temperature',
-	'fireplace/servo',
-	'fireplace/pump',
-	'fireplace/parameter',
-	'fireplace/heating_state',
-	'buffertank/temperature/top',
-	'buffertank/temperature/bottom'
-];
-
 // Event targets
 const eventTargets: any = {};
 
-export function startMqttClient() {
+let client: any;
 
-	// Create event targets
-	for (const topic of subscriptions) {
-		eventTargets[topic] = new EventTarget()
-	}
+export function startMqttClient() {
 
 	// Define options and connect
 	const options: object = {
 		keepalive: 60,
 		clientId: 'screen'
 	}
-	const client = mqtt.connect('ws://192.168.1.74:9001', options);
+	if (client === undefined) {
+		client = mqtt.connect('ws://192.168.1.74:9001', options);
+	}
 
 	// On connect, add subscriptions
 	client.on('connect', () => {
 		console.log('connect');
-		for (const topic of subscriptions) {
-			if (topic.startsWith('fireplace')) {
-				client.subscribe(topic, { 'qos': 2 });
-			} else {
-				client.subscribe(topic);
-			}
-		}
 	});
 
 	// On message, dispatch event to event target of specfic topic
@@ -62,12 +43,34 @@ export function startMqttClient() {
 }
 
 /**
+ * Subscribes a topic to a MQTT server
+ * It adds an event target to the list of targets
+ * 
+ * @param {string} topic
+ * @param {number} qos Quality of service (0, 1 or 2)
+ */
+export function subscribe(topic: string, qos: number) {
+	// If quality of service is not given, use default value
+	if (qos === undefined) qos = 1;
+
+	// Subscribe to topic
+	client.subscribe(topic, { 'qos': qos });
+
+	// Add event target
+	if (!(topic in eventTargets)) {
+		eventTargets[topic] = new EventTarget();
+	}
+}
+
+/**
  * Adds an event listener to the event target that corresponds to a MQTT topic
  * The callback for the event listener is wrapped to directly provide the message,
  * instead of the pure event
+ * 
+ * @param {string} topic
+ * @param {Function} cb Callback function that is called when the event is triggered
  */
 export function onMessage(topic: string, cb: Function) {
-	console.log('onMessage', topic);
 	const target = eventTargets[topic];
 	target.addEventListener(topic, (event: CustomEvent) => {
 		cb(event.detail.message);

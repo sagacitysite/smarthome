@@ -15,6 +15,7 @@ export class Fireplace {
 
 	private fireplaceSize: any = { w: 120, h: 180 };
 	private watertankSize: any = { w: 100, h: 200 };
+	private yOffset: number = 40;
 
 	// Icons paths
 	private fireIconPath: string = 'fire.svg';
@@ -83,6 +84,8 @@ export class Fireplace {
 
 	setServoOpening(opening: number) {
 		this.fireplace.servo.content = `${opening}%`;
+		// Re-setting the x position is necessary to keep text in center
+		this.fireplace.servo.position.x = this.ct.x-150+3;
 	}
 
 	setTemperatureFireplace(temperature: number) {
@@ -115,7 +118,7 @@ export class Fireplace {
 		// Draw outer fireplace
 		const fp = this.fireplaceSize;
 		new paper.Path.Rectangle({
-			point: [this.ct.x-fp.w/2-150, this.ct.y-fp.h/2],
+			point: [this.ct.x-fp.w/2-150, this.ct.y-fp.h/2+this.yOffset],
 			size: [fp.w, fp.h],
 			fillColor: '#080808',
 			strokeColor: '#222222',
@@ -125,7 +128,7 @@ export class Fireplace {
 		// Draw inner fireplace
 		const fpIn = { w: 90, h: 90 }
 		const fireplaceInner = new paper.Path.Rectangle({
-			point: [this.ct.x-fpIn.w/2-150, this.ct.y-fpIn.h/2],
+			point: [this.ct.x-fpIn.w/2-150, this.ct.y-fpIn.h/2+this.yOffset],
 			size: [fpIn.w, fpIn.h],
 			fillColor: '#040404',
 			strokeColor: '#222222',
@@ -141,7 +144,7 @@ export class Fireplace {
 	 */
 	drawFireplaceTemperature() {
 		return new paper.PointText({
-			point: [this.ct.x-150-15, this.ct.y-60],
+			point: [this.ct.x-150-15, this.ct.y-60+this.yOffset],
 			content: '00°',
 			style: this.textStyle
 		});
@@ -152,7 +155,7 @@ export class Fireplace {
 	 */
 	drawFireplaceAirIntake() {
 		return new paper.PointText({
-			point: [this.ct.x-150-18, this.ct.y+75],
+			point: [this.ct.x-150-25, this.ct.y+75+this.yOffset],
 			content: '100%',
 			style: this.textStyle
 		});
@@ -164,7 +167,7 @@ export class Fireplace {
 	async drawFireAsync() {
 		const fire: any = await this.importSVGAsync(this.fireIconPath);
 		fire.scale(2.5);
-		fire.position = new paper.Point(this.ct.x-150, this.ct.y+10);
+		fire.position = new paper.Point(this.ct.x-150, this.ct.y+10+this.yOffset);
 		fire.visible = false;
 
 		return fire;
@@ -176,7 +179,7 @@ export class Fireplace {
 	drawWatertank() {
 		const wt = this.watertankSize;
 		return new paper.Path.Rectangle({
-			point: [this.ct.x-wt.w/2+150, this.ct.y-110],
+			point: [this.ct.x-wt.w/2+150, this.ct.y-110+this.yOffset],
 			size: [wt.w, wt.h],
 			fillColor: '#080808',
 			strokeColor: '#222222',
@@ -189,7 +192,7 @@ export class Fireplace {
 	 */
 	drawTemperatureWatertankTop() {
 		return new paper.PointText({
-			point: [this.ct.x+150-15, this.ct.y-60-5],
+			point: [this.ct.x+150-15, this.ct.y-60-5+this.yOffset],
 			content: '00°',
 			style: this.textStyle
 		});
@@ -200,7 +203,7 @@ export class Fireplace {
 	 */
 	drawTemperatureWatertankBottom() {
 		return new paper.PointText({
-			point: [this.ct.x+150-15, this.ct.y+60],
+			point: [this.ct.x+150-15, this.ct.y+60+this.yOffset],
 			content: '00°',
 			style: this.textStyle
 		});
@@ -213,34 +216,34 @@ export class Fireplace {
 
 		// Draw flow and return connection
 		new paper.Path.Line({
-			from: [this.ct.x+fp.w/2-150, this.ct.y-fp.h/2+20],
-			to: [this.ct.x-wt.w/2+150, this.ct.y-fp.h/2+20],
+			from: [this.ct.x+fp.w/2-150, this.ct.y-fp.h/2+20+this.yOffset],
+			to: [this.ct.x-wt.w/2+150, this.ct.y-fp.h/2+20+this.yOffset],
 			strokeColor: '#222222',
 			strokeWidth: 3
 		});
 		new paper.Path.Line({
-			from: [this.ct.x+fp.w/2-150, this.ct.y+fp.h/2-20],
-			to: [this.ct.x-wt.w/2+150, this.ct.y+fp.h/2-20],
+			from: [this.ct.x+fp.w/2-150, this.ct.y+fp.h/2-20+this.yOffset],
+			to: [this.ct.x-wt.w/2+150, this.ct.y+fp.h/2-20+this.yOffset],
 			strokeColor: '#222222',
 			strokeWidth: 3
 		});
 		new paper.Path.Line({
-			from: [this.ct.x, this.ct.y-fp.h/2+20],
-			to: [this.ct.x, this.ct.y+fp.h/2-20],
+			from: [this.ct.x, this.ct.y-fp.h/2+20+this.yOffset],
+			to: [this.ct.x, this.ct.y+fp.h/2-20+this.yOffset],
 			strokeColor: '#222222',
 			strokeWidth: 3
 		});
 
 		// Draw pump
 		new paper.Path.Circle({
-			center: [this.ct.x, this.ct.y+fp.h/2-20],
+			center: [this.ct.x, this.ct.y+fp.h/2-20+this.yOffset],
 			radius: 20,
 			fillColor: '#222222'
 		});
 
 		// Icon path
 		const pump: any = await this.importSVGAsync(this.pumpIconPath);
-		pump.position = new paper.Point(this.ct.x, this.ct.y+fp.h/2-20);
+		pump.position = new paper.Point(this.ct.x, this.ct.y+fp.h/2-20+this.yOffset);
 		paper.view.onFrame = function(event: any) {
 			pump.rotate(2);
 		}
