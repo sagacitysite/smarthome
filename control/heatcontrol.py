@@ -8,9 +8,6 @@ from temperature_sensors import TemperatureSensors
 from relay import Relay
 from mqtt import MqttClient
 
-# TODO
-# * Summer program: start pump every x weeks for a short period
-
 class Heatcontrol(Thread):
 
 	def __init__(self):
@@ -73,29 +70,21 @@ class Heatcontrol(Thread):
 
 
 	def on_fireplace_final(self, message_as_string):
-		print(message_as_string)
-		# TODO
-		"""
 		state = int(message_as_string)
 		if state == 0:
 			self.servo.state_air_intake = self.INTAKE_OPEN	
 		elif state == 1:
 			self.servo.state_air_intake = self.INTAKE_FINAL
 			self.adjust_air_opening(100)
-		"""
 
 
 	def on_fireplace_boost(self, message_as_string):
-		print(message_as_string)
-		# TODO
-		"""
 		state = int(message_as_string)
 		if state == 0:
 			self.servo.state_air_intake = self.INTAKE_OPEN	
 		elif state == 1:
 			self.servo.state_air_intake = self.INTAKE_BOOST
 			self.adjust_air_opening(100)
-		"""
 
 
 	def on_fireplace_parameter(self, message_as_string):
@@ -106,6 +95,16 @@ class Heatcontrol(Thread):
 		self.profile[message['key']] = message['value']
 		# Store changed key
 		self.has_changed.append(message['key'])
+
+
+	def set_state(self, key, value):
+		"""
+		Patch fireplace state value
+		"""
+		json = { key: value }
+		r = requests.patch('http://localhost:4000/fireplace/state', json)
+
+		print('set_state', r)
 
 
 	def get_profile(self):
@@ -152,13 +151,15 @@ class Heatcontrol(Thread):
 
 		# If we count sufficiently up, we switch from cooling to heating state
 		if self.is_cooling and self.count_up >= 3:
-			self.client.publish(f'fireplace/heating_state', 1, qos=2)
+			self.set_state('heating_state', 1)
+			#self.client.publish(f'fireplace/heating_state', 1, qos=2)
 			self.is_cooling = False
 			self.is_heating = True
 		
 		# If we count sufficiently down, we switch from heating to cooling state
 		if self.is_heating and self.count_down >= 3:
-			self.client.publish(f'fireplace/heating_state', 0, qos=2)
+			self.set_state('heating_state', 0)
+			#self.client.publish(f'fireplace/heating_state', 0, qos=2)
 			self.is_cooling = True
 			self.is_heating = False
 
@@ -168,7 +169,8 @@ class Heatcontrol(Thread):
 		Adjust fireplace air opening and publish to mqtt broker
 		"""
 		self.servo.adjust_air_opening(opening)
-		self.client.publish(f'fireplace/servo', opening, qos=2)
+		self.set_state('servo', opening)
+		#self.client.publish(f'fireplace/servo', opening, qos=2)
 
 
 	def switch_pump_relay(self, state):
@@ -176,7 +178,8 @@ class Heatcontrol(Thread):
 		Switch pump relay (on/off) and publish to mqtt broker
 		"""
 		self.pump.set_state(state)
-		self.client.publish(f'fireplace/pump', int(state), qos=2)
+		self.set_state('pump', int(state))
+		#self.client.publish(f'fireplace/pump', int(state), qos=2)
 
 
 	def evaluate_and_update_actuators(self):
@@ -230,7 +233,7 @@ class Heatcontrol(Thread):
 
 		# If one of the air intake temperature parameters has changed, set air intake
 		# state to undefined, which forces a re-evaluation of the conditions below
-		# NOTE The undefined state (and therefore the old fireplace state) remaind,
+		# NOTE The undefined state (and therefore the old fireplace state) remains,
 		#      until one of the conditions below was met
 		if (
 				't_air_intake_close_half' in self.has_changed or
@@ -282,8 +285,7 @@ class Heatcontrol(Thread):
 			# If we're cooling down and final burn was active,
 			# inform server that final state ends now
 			if self.servo.state_air_intake == self.servo.INTAKE_FINAL:
-				pass
-				# TODO send '/fireplace/state' 0 via http patch to nodejs server
+				self.set_state('final', 0)
 
 
 	def run(self):
