@@ -21,7 +21,7 @@ export class Fireplace {
 
 		this.boost = {
 			'started': -1,
-			'duration': 3*60,  // Seconds
+			'duration': 2*60,  // Seconds
 			'timeout': undefined
 		}
 	}

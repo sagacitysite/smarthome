@@ -50,12 +50,11 @@ class Heatcontrol(Thread):
 		# Define after how many intervals the sensors/actuators are evaluated
 		# The final interval in seconds calculates as interval_count x interval
 		self.interval_count_sensors = 1
-		self.interval_count_actuators = 6
+		self.interval_count_actuators = 3
 
 		# Get parameters from server
 		self.profile = self.get_profile()
 		self.has_changed = []  # Array to indicate profile value that have recently changed
-		print('self.profile', self.profile)
 
 		# Subscribe to changes of fireplace parameters and add a callback function
 		# that is called if an MQTT message arrives
@@ -72,18 +71,18 @@ class Heatcontrol(Thread):
 	def on_fireplace_final(self, message_as_string):
 		state = int(message_as_string)
 		if state == 0:
-			self.servo.state_air_intake = self.INTAKE_OPEN	
+			self.servo.state_air_intake = self.servo.INTAKE_OPEN	
 		elif state == 1:
-			self.servo.state_air_intake = self.INTAKE_FINAL
+			self.servo.state_air_intake = self.servo.INTAKE_FINAL
 			self.adjust_air_opening(100)
 
 
 	def on_fireplace_boost(self, message_as_string):
 		state = int(message_as_string)
 		if state == 0:
-			self.servo.state_air_intake = self.INTAKE_OPEN	
+			self.servo.state_air_intake = self.servo.INTAKE_OPEN	
 		elif state == 1:
-			self.servo.state_air_intake = self.INTAKE_BOOST
+			self.servo.state_air_intake = self.servo.INTAKE_BOOST
 			self.adjust_air_opening(100)
 
 
@@ -101,10 +100,8 @@ class Heatcontrol(Thread):
 		"""
 		Patch fireplace state value
 		"""
-		json = { key: value }
-		r = requests.patch('http://localhost:4000/fireplace/state', json)
-
-		print('set_state', r)
+		json = { 'key': key, 'value': value }
+		r = requests.patch('http://localhost:4000/fireplace/state', json=json)
 
 
 	def get_profile(self):
@@ -299,7 +296,7 @@ class Heatcontrol(Thread):
 				self.update_and_evaluate_sensors()
 
 			# Execute every twelvth interval
-			if counter % 1 == 0: #self.interval_count_actuators == 0:
+			if counter % self.interval_count_actuators == 0:
 				self.evaluate_and_update_actuators()
 				# Clear has_changed array
 				self.has_changed = []

@@ -86,7 +86,7 @@ app.patch('/fireplace/state', jsonParser, (req, res) => {
 
 	if (wasSuccessful) {
 		// If update was successful, publish state value to all subscribers
-		client.publish(`fireplace/${key}`, value);
+		client.publish(`fireplace/${key}`, value.toString());
 		// Send ok to client
 		res.send('OK');
 	} else {
