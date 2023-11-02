@@ -45,5 +45,11 @@ class TemperatureSensors():
 
 		# Find sensor
 		sensor = self.get_sensor_by_name(sensor_name)
+		# Get temperatur
+		temperature = 0
+		try:
+			temperature = sensor.get_temperature()
+		except:
+			temperature = 999
 		# Return rounded temperature
-		return int(round(sensor.get_temperature(), 0))
+		return int(round(temperature, 0))

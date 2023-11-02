@@ -26,7 +26,9 @@ class Heatcontrol(Thread):
 		self.servo = AirIntakeServoMotor()
 
 		# Instantiate pump relay
-		self.pump = Relay(22)
+		# Note that the relay is default open (pump is running when relay is False),
+		# so we need to open the relay initially to make sure the pump is not running initially
+		self.pump = Relay(22, is_open=True)
 
 		# Define a flag that indicates a running thread
 		self.is_running = True
@@ -71,7 +73,8 @@ class Heatcontrol(Thread):
 	def on_fireplace_final(self, message_as_string):
 		state = int(message_as_string)
 		if state == 0:
-			self.servo.state_air_intake = self.servo.INTAKE_OPEN	
+			self.servo.state_air_intake = self.servo.INTAKE_OPEN
+			self.evaluate_and_update_actuators()
 		elif state == 1:
 			self.servo.state_air_intake = self.servo.INTAKE_FINAL
 			self.adjust_air_opening(100)
@@ -80,7 +83,8 @@ class Heatcontrol(Thread):
 	def on_fireplace_boost(self, message_as_string):
 		state = int(message_as_string)
 		if state == 0:
-			self.servo.state_air_intake = self.servo.INTAKE_OPEN	
+			self.servo.state_air_intake = self.servo.INTAKE_OPEN
+			self.evaluate_and_update_actuators()
 		elif state == 1:
 			self.servo.state_air_intake = self.servo.INTAKE_BOOST
 			self.adjust_air_opening(100)
@@ -109,7 +113,7 @@ class Heatcontrol(Thread):
 		Request profile values from nodejs server
 		"""
 		r = requests.get('http://localhost:4000/fireplace/profile')
-		
+
 		if r.status_code == 200:
 			return r.json()
 		else:
@@ -152,9 +156,9 @@ class Heatcontrol(Thread):
 			#self.client.publish(f'fireplace/heating_state', 1, qos=2)
 			self.is_cooling = False
 			self.is_heating = True
-		
+
 		# If we count sufficiently down, we switch from heating to cooling state
-		if self.is_heating and self.count_down >= 3:
+		if self.is_heating and self.count_down >= 5:
 			self.set_state('heating_state', 0)
 			#self.client.publish(f'fireplace/heating_state', 0, qos=2)
 			self.is_cooling = True
@@ -174,7 +178,8 @@ class Heatcontrol(Thread):
 		"""
 		Switch pump relay (on/off) and publish to mqtt broker
 		"""
-		self.pump.set_state(state)
+		# We toggle the state for the relay, since the relay is default open
+		self.pump.set_state(not state)
 		self.set_state('pump', int(state))
 		#self.client.publish(f'fireplace/pump', int(state), qos=2)
 
@@ -277,12 +282,12 @@ class Heatcontrol(Thread):
 				self.t_fireplace <= p['t_air_intake_open'] and
 				self.is_cooling
 			):
-			self.servo.state_air_intake = self.servo.INTAKE_OPEN
-			self.adjust_air_opening(100)
 			# If we're cooling down and final burn was active,
 			# inform server that final state ends now
 			if self.servo.state_air_intake == self.servo.INTAKE_FINAL:
 				self.set_state('final', 0)
+			self.servo.state_air_intake = self.servo.INTAKE_OPEN
+			self.adjust_air_opening(100)
 
 
 	def run(self):

@@ -2,7 +2,7 @@ import RPi.GPIO as GPIO
 
 class Relay():
 
-	def __init__(self, PIN):
+	def __init__(self, PIN, is_open=False):
 		"""
 		Init pump relay
 		"""
@@ -10,13 +10,13 @@ class Relay():
 		# Init PIN
 		self.relay_PIN = PIN
 		# Flag indicating state of relay
-		self.is_open = False
+		self.is_open = is_open
 
 		# Setup GPIO PIN for relay
 		GPIO.setup(self.relay_PIN, GPIO.OUT)
 
-		# Start program with closed relay
-		self.close()
+		# Set initial state
+		self.set_state(is_open)
 
 
 	def set_state(self, state):

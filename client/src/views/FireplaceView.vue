@@ -9,8 +9,8 @@ import { get, patch } from '../services/http';
 import { formatTime } from '../services/time';
 
 const settings = reactive({
-	't_relais_on': { 'label': 'Relay ON', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
-	't_relais_off': { 'label': 'Relay OFF', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
+	't_relais_on': { 'label': 'Pump ON', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
+	't_relais_off': { 'label': 'Pump OFF', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
 	't_air_intake_close_half': { 'label': 'Half close air intake', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
 	't_air_intake_close': { 'label': 'Full close air intake', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
 	't_air_intake_open': { 'label': 'Open air intake', 'value': 0, 'unit': '°', 'step': 1, 'isUpdating': false },
