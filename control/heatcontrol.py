@@ -198,7 +198,7 @@ class Heatcontrol(Thread):
 				# Default case
 				(
 					self.is_heating and
-					not self.pump.is_open and
+					self.pump.is_open and  # Note that relay state is inverted for pump
 					self.t_fireplace >= p['t_relais_on']
 				) or
 				# If t_relais_off value has changed to a lower value, we possibly need
@@ -206,7 +206,7 @@ class Heatcontrol(Thread):
 				(
 					't_relais_off' in self.has_changed and
 					self.is_cooling and
-					not self.pump.is_open and
+					self.pump.is_open and  # Note that relay state is inverted for pump
 					self.t_fireplace > p['t_relais_off']
 				)
 			):
@@ -218,7 +218,7 @@ class Heatcontrol(Thread):
 				# Default case
 				(
 					self.is_cooling and
-					self.pump.is_open and
+					not self.pump.is_open and  # Note that relay state is inverted for pump
 					self.t_fireplace <= p['t_relais_off']
 					# or self.t_exhaust < xx
 				) or
@@ -227,7 +227,7 @@ class Heatcontrol(Thread):
 				(
 					't_relais_on' in self.has_changed and
 					self.is_heating and
-					self.pump.is_open and
+					not self.pump.is_open and  # Note that relay state is inverted for pump
 					self.t_fireplace < p['t_relais_on']
 				)
 		):

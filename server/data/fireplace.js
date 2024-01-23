@@ -2,12 +2,12 @@ export class Fireplace {
 
 	constructor() {
 		this.parameter = {
-			't_relais_on': 40, //22, //40,
+			't_relais_on': 45, //22, //40,
 			't_relais_off': 70, //18, //70,
-			't_air_intake_close_half': 35, //20, //35,
-			't_air_intake_close': 45, //24, //45,
+			't_air_intake_close_half': 40, //20, //35,
+			't_air_intake_close': 50, //24, //45,
 			't_air_intake_open': 65, //20, //65,
-			'air_intake_opening_at_full_burn': 25, //0
+			'air_intake_opening_at_full_burn': 30, //0
 		};
 
 		this.state = {
