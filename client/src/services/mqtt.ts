@@ -14,7 +14,7 @@ export function startMqttClient() {
 		clientId: 'screen'
 	}
 	if (client === undefined) {
-		client = mqtt.connect('ws://192.168.1.74:9001', options);
+		client = mqtt.connect('ws://192.168.1.126:9001', options);
 	}
 
 	// On connect, add subscriptions

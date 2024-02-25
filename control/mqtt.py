@@ -23,7 +23,7 @@ class MqttClient():
 		self.mqtt.on_subscribe = self.on_mqtt_subscribe
 
 		# Connect to MQTT broker
-		self.mqtt.connect('localhost')
+		self.mqtt.connect('192.168.1.126')
 
 		# Run client in background
 		self.mqtt.loop_start()

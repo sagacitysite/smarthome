@@ -8,6 +8,8 @@ from temperature_sensors import TemperatureSensors
 from relay import Relay
 from mqtt import MqttClient
 
+host = '192.168.1.126'
+
 class Heatcontrol(Thread):
 
 	def __init__(self):
@@ -105,14 +107,14 @@ class Heatcontrol(Thread):
 		Patch fireplace state value
 		"""
 		json = { 'key': key, 'value': value }
-		r = requests.patch('http://localhost:4000/fireplace/state', json=json)
+		r = requests.patch(f'http://{host}:4000/fireplace/state', json=json)
 
 
 	def get_profile(self):
 		"""
 		Request profile values from nodejs server
 		"""
-		r = requests.get('http://localhost:4000/fireplace/profile')
+		r = requests.get(f'http://{host}:4000/fireplace/profile')
 
 		if r.status_code == 200:
 			return r.json()

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const URL = 'http://192.168.1.74:4000';
+const URL = 'http://192.168.1.126:4000';
 
 export async function get(path) {
 	return axios.get(`${URL}${path}`);
