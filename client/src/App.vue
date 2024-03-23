@@ -14,8 +14,7 @@ let timer;
 function startTimer() {
 	timer = setTimeout(() => {
 		showScreensaver.value = true;
-	//}, 3*60*1000)
-	}, 5*1000)
+	}, 3*60*1000);
 }
 
 startTimer();

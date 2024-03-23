@@ -22,7 +22,7 @@ onBeforeUnmount(() => {
 	clearInterval(clock);
 });
 
-onMessage('fireplace/temperature', (temp) => {
+/*onMessage('fireplace/temperature', (temp) => {
 	fireplaceTemperature.value = temp;
 });
 
@@ -32,7 +32,7 @@ onMessage('buffertank/temperature/top', (temp) => {
 
 onMessage('buffertank/temperature/bottom', (temp) => {
 	tankTemperatureBottom.value = temp;
-});
+});*/
 
 </script>
 
