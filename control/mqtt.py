@@ -85,6 +85,7 @@ class MqttClient():
 		"""
 		Called when MQTT disconnects
 		"""
+		print('disconnected, reason', rc)
 		pass
 
 
